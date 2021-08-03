@@ -16,7 +16,7 @@
             <main class="page-container">
                 <section class="page-container__left-side">
                     <img src="./assets/jackson-david-BL_Q4zjduGU-unsplash.jpg" alt="woman in yellow background"
-                         title="African Sound" class="page-container__left-side__image"/>
+                         title="African Sound" class="page-container__left-side__image" loading="lazy"/>
                     <!-- logo and text--> 
                     <div class="page-container__left-side__element-container">
                         <!-- logo -->

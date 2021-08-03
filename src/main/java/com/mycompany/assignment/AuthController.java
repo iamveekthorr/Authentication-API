@@ -21,8 +21,11 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
+import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import javax.xml.bind.DatatypeConverter;
 
@@ -35,7 +38,8 @@ import javax.xml.bind.DatatypeConverter;
 public class AuthController implements Filter {
 
     private static final boolean debug = true;
-    private static final String SECRET_KEY = "They-say-the-joker-is-a-wanted-man";
+    private static final String SECRET_KEY = "they-say-the-joker-is-a-wanted-man-need-for-speed-carbon-own-the-city-alongside-call"
+            + "-of-duty-morden-warfare-3-survival";
 
     // The filter configuration object we are associated with. If
     // this value is null, this filter instance is not currently
@@ -84,7 +88,11 @@ public class AuthController implements Filter {
         Date now = new Date(nowMillis);
 
         //We will sign our JWT with our ApiKey secret
+//        SecretKey apiKeySecretBytes = Keys.hmacShaKeyFor(SECRET_KEY.getBytes(StandardCharsets.UTF_8));
+
         byte[] apiKeySecretBytes = DatatypeConverter.parseBase64Binary(SECRET_KEY);
+//        SecretKey apiKeySecretBytes = Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET_KEY));
+
         Key signingKey = new SecretKeySpec(apiKeySecretBytes, signatureAlgorithm.getJcaName());
 
         //Let's set the JWT Claims
@@ -130,7 +138,9 @@ public class AuthController implements Filter {
             log("AuthController:doFilter()");
         }
 
-        doBeforeProcessing(request, response);
+        String token = createJWT("USER1", "Devthorr", "Jane Doe", 1000000);
+        System.out.println(token);
+//        doBeforeProcessing(request, response);
 
         Throwable problem = null;
         try {

@@ -36,7 +36,7 @@ public class SignIn extends HttpServlet {
         try {
             
            
-        } catch (Exception | JWTCreationException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
