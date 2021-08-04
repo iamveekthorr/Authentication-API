@@ -19,7 +19,7 @@ import javax.servlet.http.HttpServletResponse;
  *
  * @author Victor Okonkwo
  */
-@WebServlet(name = "SignIn", urlPatterns = {"/sign-in"})
+@WebServlet(name = "SignIn", urlPatterns = {"/auth/sign-in"})
 public class SignIn extends HttpServlet {
 
     /**

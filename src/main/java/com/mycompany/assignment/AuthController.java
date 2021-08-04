@@ -21,19 +21,19 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
-import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
-import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.DatatypeConverter;
 
 /**
  *
  * @author Victor Okonkwo
  */
-@WebFilter(filterName = "AuthController", urlPatterns = {"/*"}, dispatcherTypes = {DispatcherType.REQUEST,
+@WebFilter(filterName = "AuthController", urlPatterns = {"/", "/auth/sign-in"}, dispatcherTypes = {DispatcherType.REQUEST,
     DispatcherType.FORWARD, DispatcherType.INCLUDE})
 public class AuthController implements Filter {
 
@@ -88,10 +88,8 @@ public class AuthController implements Filter {
         Date now = new Date(nowMillis);
 
         //We will sign our JWT with our ApiKey secret
-//        SecretKey apiKeySecretBytes = Keys.hmacShaKeyFor(SECRET_KEY.getBytes(StandardCharsets.UTF_8));
 
         byte[] apiKeySecretBytes = DatatypeConverter.parseBase64Binary(SECRET_KEY);
-//        SecretKey apiKeySecretBytes = Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET_KEY));
 
         Key signingKey = new SecretKeySpec(apiKeySecretBytes, signatureAlgorithm.getJcaName());
 
@@ -131,20 +129,23 @@ public class AuthController implements Filter {
      * @exception IOException if an input/output error occurs
      * @exception ServletException if a servlet error occurs
      */
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
             throws IOException, ServletException {
 
         if (debug) {
             log("AuthController:doFilter()");
         }
-
+        HttpServletResponse response = HttpServletResponse.class.cast(res);
         String token = createJWT("USER1", "Devthorr", "Jane Doe", 1000000);
-        System.out.println(token);
+        Cookie cookie = new Cookie("jwt",token);
+        response.addCookie(cookie);
+        System.out.println("cookie name " + cookie.getName());
+        System.out.println("cookie value " + cookie.getValue());
 //        doBeforeProcessing(request, response);
 
         Throwable problem = null;
         try {
-            chain.doFilter(request, response);
+            chain.doFilter(req, res);
         } catch (Throwable t) {
             // If an exception is thrown somewhere down the filter chain,
             // we still want to execute our after processing, and then
@@ -153,7 +154,7 @@ public class AuthController implements Filter {
             t.printStackTrace();
         }
 
-        doAfterProcessing(request, response);
+        doAfterProcessing(req, response);
 
         // If there was a problem, we want to rethrow it if it is
         // a known type, otherwise log it.
