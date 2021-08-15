@@ -21,8 +21,14 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.security.Key;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
@@ -33,13 +39,13 @@ import javax.xml.bind.DatatypeConverter;
  *
  * @author Victor Okonkwo
  */
-@WebFilter(filterName = "AuthController", urlPatterns = {"/", "/auth/sign-in"}, dispatcherTypes = {DispatcherType.REQUEST,
-    DispatcherType.FORWARD, DispatcherType.INCLUDE})
+@WebFilter(filterName = "AuthController", urlPatterns = {"/auth/sign-in"}, dispatcherTypes = {
+    DispatcherType.REQUEST, DispatcherType.FORWARD, DispatcherType.INCLUDE})
 public class AuthController implements Filter {
 
     private static final boolean debug = true;
-    private static final String SECRET_KEY = "they-say-the-joker-is-a-wanted-man-need-for-speed-carbon-own-the-city-alongside-call"
-            + "-of-duty-morden-warfare-3-survival";
+    private static InputStream reader;
+    private static Properties properties = new Properties();
 
     // The filter configuration object we are associated with. If
     // this value is null, this filter instance is not currently
@@ -47,83 +53,104 @@ public class AuthController implements Filter {
     private FilterConfig filterConfig = null;
 
     public AuthController() {
-
-    }
-
-    private void doBeforeProcessing(ServletRequest req, ServletResponse res) throws IOException, ServletException {
-
-    }
-
-    private void doAfterProcessing(ServletRequest request, ServletResponse response)
-            throws IOException, ServletException {
-        if (debug) {
-            log("AuthController:DoAfterProcessing");
+        try {
+            reader = new FileInputStream("C:\\Users\\Devthorr\\Documents\\NetBeansProjects\\Assignment\\src\\resources\\config.properties");
+            properties.load(reader);
+        } catch (Exception ex) {
+            ex.printStackTrace();
         }
-
-        // Write code here to process the request and/or response after
-        // the rest of the filter chain is invoked.
-        // For example, a logging filter might log the attributes on the
-        // request object after the request has been processed.
-        /*
-         * for (Enumeration en = request.getAttributeNames(); en.hasMoreElements(); ) {
-         * String name = (String)en.nextElement(); Object value =
-         * request.getAttribute(name); log("attribute: " + name + "=" +
-         * value.toString());
-         * 
-         * }
-         */
-        // For example, a filter might append something to the response.
-        /*
-         * PrintWriter respOut = new PrintWriter(response.getWriter());
-         * respOut.println("<P><B>This has been appended by an intrusive filter.</B>");
-         */
     }
 
-    public static String createJWT(String id, String issuer, String subject, long ttlMillis) {
+    // Sign user token based on currently logged in user 
+    public static JwtBuilder signToken(String id) {
+        return Jwts.builder().setId(id);
+    }
 
-        //The JWT signature algorithm we will be using to sign the token
+    // create and send Token to the client 
+    public static String createJWT(String id, String issuer, String subject, long ttlMillis) {
+        
+        Map<String, Object> cookieOptions = new HashMap<>();
+        cookieOptions.put("httpOnly", true);
+        cookieOptions.put("secure", true);
+        
+        // The JWT signature algorithm we will be using to sign the token
         SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.HS256;
 
         long nowMillis = System.currentTimeMillis();
         Date now = new Date(nowMillis);
 
-        //We will sign our JWT with our ApiKey secret
-
-        byte[] apiKeySecretBytes = DatatypeConverter.parseBase64Binary(SECRET_KEY);
-
+        // We will sign our JWT with our ApiKey secret
+        byte[] apiKeySecretBytes = DatatypeConverter.parseBase64Binary(
+                properties.getProperty("SECERET_KEY"));
         Key signingKey = new SecretKeySpec(apiKeySecretBytes, signatureAlgorithm.getJcaName());
 
-        //Let's set the JWT Claims
-        JwtBuilder builder = Jwts.builder().setId(id)
-                .setIssuedAt(now)
-                .setSubject(subject)
-                .setIssuer(issuer)
-                .signWith(signingKey, signatureAlgorithm);
+        // Let's set the JWT Claims
+        JwtBuilder builder = signToken(id).setIssuedAt(now).setSubject(subject).setIssuer(issuer).signWith(signingKey,
+                signatureAlgorithm).setClaims(cookieOptions);
+        
 
-        //if it has been specified, let's add the expiration
+        // if it has been specified, let's add the expiration
         if (ttlMillis > 0) {
             long expMillis = nowMillis + ttlMillis;
             Date exp = new Date(expMillis);
             builder.setExpiration(exp);
         }
-
-        //Builds the JWT and serializes it to a compact, URL-safe string
+        // Builds the JWT and serializes it to a compact, URL-safe string
         return builder.compact();
     }
 
+    // Decode JWT and verify the Token 
     public static Claims decodeJWT(String jwt) {
-        //This line will throw an exception if it is not a signed JWS (as expected)
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(DatatypeConverter.parseBase64Binary(SECRET_KEY))
-                .build()
-                .parseClaimsJws(jwt).getBody();
+        // This line will throw an exception if it is not a signed JWS (as expected)
+        Claims claims = Jwts.parserBuilder().setSigningKey(DatatypeConverter.parseBase64Binary(
+                properties.getProperty("SECERET_KEY")))
+                .build().parseClaimsJws(jwt).getBody();
         return claims;
+    }
+
+    void login(ServletRequest request, ServletResponse response) throws IOException {
+        HttpServletResponse res = HttpServletResponse.class.cast(response);
+        HttpServletRequest req = HttpServletRequest.class.cast(request);
+        Object token; 
+        
+        token = createJWT("USER1", "Devthorr", "Jane Doe", 1000000);
+        Cookie cookie = new Cookie("jwt", token.toString());
+        res.addCookie(cookie);
+        System.out.println(cookie.getName() + "\n" + cookie.getValue());
+    }
+
+    void protect(ServletRequest request, ServletResponse response) {
+        HttpServletResponse res = HttpServletResponse.class.cast(response);
+        HttpServletRequest req = HttpServletRequest.class.cast(request);
+        Object token = null;
+        try {
+            if (req.getHeader("Authorization") != null 
+                    && req.getHeader("Authorization").startsWith("Bearer")) {
+                System.out.println("Inside the Auth");
+                token = req.getHeader("Authorization").split(" ", 1);
+                System.out.println(token.toString());
+                return;
+            } else if (req.getCookies() == null) {
+                token = createJWT("USER2", "Devthorr", "Jane Doe", 1000000);
+                Cookie cookie = new Cookie("jwt", token.toString());
+                res.addCookie(cookie);
+                return;
+            }
+
+            if (token == null) {
+                // CREATE ERROR CONTROLLER
+                return;
+            }
+
+        } catch (NullPointerException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
      *
-     * @param request The servlet request we are processing
-     * @param response The servlet response we are creating
+     * @param req The servlet request we are processing
+     * @param res The servlet response we are creating
      * @param chain The filter chain we are processing
      *
      * @exception IOException if an input/output error occurs
@@ -131,17 +158,11 @@ public class AuthController implements Filter {
      */
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
             throws IOException, ServletException {
-
+        login(req, res);
+        protect(req, res);
         if (debug) {
             log("AuthController:doFilter()");
         }
-        HttpServletResponse response = HttpServletResponse.class.cast(res);
-        String token = createJWT("USER1", "Devthorr", "Jane Doe", 1000000);
-        Cookie cookie = new Cookie("jwt",token);
-        response.addCookie(cookie);
-        System.out.println("cookie name " + cookie.getName());
-        System.out.println("cookie value " + cookie.getValue());
-//        doBeforeProcessing(request, response);
 
         Throwable problem = null;
         try {
@@ -153,9 +174,6 @@ public class AuthController implements Filter {
             problem = t;
             t.printStackTrace();
         }
-
-        doAfterProcessing(req, response);
-
         // If there was a problem, we want to rethrow it if it is
         // a known type, otherwise log it.
         if (problem != null) {
@@ -165,7 +183,7 @@ public class AuthController implements Filter {
             if (problem instanceof IOException) {
                 throw (IOException) problem;
             }
-            sendProcessingError(problem, response);
+            sendProcessingError(problem, res);
         }
     }
 
@@ -257,6 +275,7 @@ public class AuthController implements Filter {
             sw.close();
             stackTrace = sw.getBuffer().toString();
         } catch (Exception ex) {
+            ex.printStackTrace();
         }
         return stackTrace;
     }
