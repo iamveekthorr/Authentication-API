@@ -6,6 +6,7 @@
 package com.mycompany.assignment;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Date;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -35,7 +36,14 @@ public class SignIn extends HttpServlet {
             throws ServletException, IOException {
         try {
             
+           AuthenticationContoller authController = new AuthenticationContoller();
            
+           authController.protect(req, res);
+           authController.login(req, res);
+           Object[] reqBodyArr = req.getReader().lines().toArray();
+            for (int i = 0; i < reqBodyArr.length; i++) {
+                System.out.println(reqBodyArr[i]);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
