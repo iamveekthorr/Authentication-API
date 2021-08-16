@@ -34,6 +34,7 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.DatatypeConverter;
+import org.json.simple.JSONObject;
 
 /**
  *
@@ -68,11 +69,10 @@ public class AuthController implements Filter {
 
     // create and send Token to the client 
     public static String createJWT(String id, String issuer, String subject, long ttlMillis) {
-        
         Map<String, Object> cookieOptions = new HashMap<>();
         cookieOptions.put("httpOnly", true);
         cookieOptions.put("secure", true);
-        
+
         // The JWT signature algorithm we will be using to sign the token
         SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.HS256;
 
@@ -87,7 +87,6 @@ public class AuthController implements Filter {
         // Let's set the JWT Claims
         JwtBuilder builder = signToken(id).setIssuedAt(now).setSubject(subject).setIssuer(issuer).signWith(signingKey,
                 signatureAlgorithm).setClaims(cookieOptions);
-        
 
         // if it has been specified, let's add the expiration
         if (ttlMillis > 0) {
@@ -95,6 +94,7 @@ public class AuthController implements Filter {
             Date exp = new Date(expMillis);
             builder.setExpiration(exp);
         }
+
         // Builds the JWT and serializes it to a compact, URL-safe string
         return builder.compact();
     }
@@ -108,15 +108,23 @@ public class AuthController implements Filter {
         return claims;
     }
 
-    void login(ServletRequest request, ServletResponse response) throws IOException {
+    void login(ServletRequest request, ServletResponse response){
         HttpServletResponse res = HttpServletResponse.class.cast(response);
         HttpServletRequest req = HttpServletRequest.class.cast(request);
-        Object token; 
-        
+        Object token;
+
         token = createJWT("USER1", "Devthorr", "Jane Doe", 1000000);
         Cookie cookie = new Cookie("jwt", token.toString());
         res.addCookie(cookie);
-        System.out.println(cookie.getName() + "\n" + cookie.getValue());
+        try{
+            JSONObject obj = new JSONObject();
+            obj.put("token", token);
+            res.setContentType("application/json");
+            res.setCharacterEncoding("UTF-8");
+            res.getWriter().write(obj.toJSONString());
+        }catch(IOException ex){
+            ex.printStackTrace();
+        }
     }
 
     void protect(ServletRequest request, ServletResponse response) {
@@ -124,24 +132,22 @@ public class AuthController implements Filter {
         HttpServletRequest req = HttpServletRequest.class.cast(request);
         Object token = null;
         try {
-            if (req.getHeader("Authorization") != null 
+            if (req.getHeader("Authorization") != null
                     && req.getHeader("Authorization").startsWith("Bearer")) {
-                System.out.println("Inside the Auth");
                 token = req.getHeader("Authorization").split(" ", 1);
-                System.out.println(token.toString());
                 return;
-            } else if (req.getCookies() == null) {
-                token = createJWT("USER2", "Devthorr", "Jane Doe", 1000000);
-                Cookie cookie = new Cookie("jwt", token.toString());
-                res.addCookie(cookie);
+            } else if (req.getCookies() != null) {
+                token = req.getHeader("Cookie");
                 return;
             }
 
             if (token == null) {
+                System.out.println("No Token");
                 // CREATE ERROR CONTROLLER
                 return;
             }
-
+            // Create better error handling 
+            decodeJWT(token.toString());
         } catch (NullPointerException e) {
             e.printStackTrace();
         }
@@ -158,12 +164,11 @@ public class AuthController implements Filter {
      */
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
             throws IOException, ServletException {
-        login(req, res);
-        protect(req, res);
+
         if (debug) {
             log("AuthController:doFilter()");
         }
-
+        login(req, res);
         Throwable problem = null;
         try {
             chain.doFilter(req, res);
