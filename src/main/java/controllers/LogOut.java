@@ -6,7 +6,6 @@
 package controllers;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.servlet.ServletException;
@@ -16,50 +15,22 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 /**
- * s
  *
  * @author Victor Okonkwo
  */
-@WebServlet(name = "SignIn", urlPatterns = {"/auth/sign-in"})
-public class LogInServlet extends HttpServlet {
-
-    /**
-     * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
-     * methods.
-     *
-     * @param request servlet request
-     * @param response servlet response
-     * @throws ServletException if a servlet-specific error occurs
-     * @throws IOException if an I/O error occurs
-     */
-    protected void processPostRequest(HttpServletRequest req, HttpServletResponse res)
-            throws ServletException, IOException {
-        try {
-            
-           AuthenticationContoller authController = new AuthenticationContoller();
-           authController.login(req, res);
-           new UserController().printStuff();
-           Object[] reqBodyArr = req.getReader().lines().toArray();
-            for (Object reqBodyArr1 : reqBodyArr) {
-                System.out.println(reqBodyArr1);
-            }
-        } catch (IOException ex) {
-            Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
-        }
-
-    }
+@WebServlet(name = "LogOut", urlPatterns = {"/auth/logout"})
+public class LogOut extends HttpServlet {
 
     protected void processGetRequest(HttpServletRequest req, HttpServletResponse res) {
         try {
-            req.getRequestDispatcher("/sign-in.jsp").forward(req, res);
-            res.setContentType("text/html;charset=UTF-8");
-        } catch (Exception e) {
-            e.printStackTrace();
+            AuthenticationContoller authController = new AuthenticationContoller();
+            authController.logOut(req, res);
+        } catch (Exception ex) {
+            Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
     }
 
-    // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the
-    // + sign on the left to edit the code.">
+    // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code.">
     /**
      * Handles the HTTP <code>GET</code> method.
      *
@@ -85,7 +56,6 @@ public class LogInServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        processPostRequest(request, response);
     }
 
     /**

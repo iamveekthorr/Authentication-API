@@ -3,14 +3,13 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.mycompany.assignment;
+package controllers;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureAlgorithm;
-import java.io.FileInputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.Key;
@@ -18,14 +17,15 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.crypto.spec.SecretKeySpec;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.DatatypeConverter;
 import org.json.simple.JSONObject;
+import utils.AppError;
 
 /**
  *
@@ -34,14 +34,14 @@ import org.json.simple.JSONObject;
 public class AuthenticationContoller {
 
     private static InputStream reader;
-    private static Properties properties = new Properties();
+    public static Properties properties = new Properties();
 
     public AuthenticationContoller() {
         try {
             reader = Thread.currentThread().getContextClassLoader().getResourceAsStream("config.properties");
             properties.load(reader);
-        } catch (Exception ex) {
-            ex.printStackTrace();
+        } catch (IOException ex) {
+            Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
     }
 
@@ -81,19 +81,23 @@ public class AuthenticationContoller {
         // Builds the JWT and serializes it to a compact, URL-safe string
         return builder.compact();
     }
-    // Decode JWT and verify the Token 
 
+    // Decode JWT and verify the Token 
     public static Claims decodeJWT(String jwt) {
-        // This line will throw an exception if it is not a signed JWS (as expected)
-        Claims claims = Jwts.parserBuilder().setSigningKey(DatatypeConverter.parseBase64Binary(
-                properties.getProperty("SECERET_KEY")))
-                .build().parseClaimsJws(jwt).getBody();
-        return claims;
+        // This line will throw an exception if it is not a signed JWS (as expected
+        Claims claims;
+        try {
+            claims = Jwts.parserBuilder().setSigningKey(DatatypeConverter.parseBase64Binary(
+                    properties.getProperty("SECERET_KEY")))
+                    .build().parseClaimsJws(jwt).getBody();
+            return claims;
+        } catch (MalformedJwtException ex) {
+            Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
+        }
+        return null;
     }
 
-    void login(ServletRequest request, ServletResponse response) {
-        HttpServletResponse res = HttpServletResponse.class.cast(response);
-        HttpServletRequest req = HttpServletRequest.class.cast(request);
+    void login(HttpServletRequest req, HttpServletResponse res) {
         Object token;
 
         token = createJWT("USER1", "Devthorr", "Jane Doe", 1000000);
@@ -106,33 +110,54 @@ public class AuthenticationContoller {
             res.setCharacterEncoding("UTF-8");
             res.getWriter().write(obj.toJSONString());
         } catch (IOException ex) {
-            ex.printStackTrace();
+            Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
     }
 
-    void protect(ServletRequest request, ServletResponse response) {
-        HttpServletResponse res = HttpServletResponse.class.cast(response);
-        HttpServletRequest req = HttpServletRequest.class.cast(request);
+    void logOut(HttpServletRequest req, HttpServletResponse res) {
+        Object token = "LoggedOut";
+        Cookie cookie = new Cookie("jwt", token.toString());
+        cookie.setMaxAge(0);
+        res.addCookie(cookie);
+        try {
+            JSONObject obj = new JSONObject();
+            obj.put("token", "Logged out");
+            obj.put("status", "success");
+            res.setContentType("application/json");
+            res.setCharacterEncoding("UTF-8");
+            res.getWriter().write(obj.toJSONString());
+        } catch (IOException ex) {
+            Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
+        }
+    }
+
+    void protect(HttpServletRequest req, HttpServletResponse res) {
         Object token = null;
         try {
             if (req.getHeader("Authorization") != null
                     && req.getHeader("Authorization").startsWith("Bearer")) {
                 token = req.getHeader("Authorization").split(" ", 1);
-                return;
             } else if (req.getCookies() != null) {
                 token = req.getHeader("Cookie");
-                return;
             }
 
             if (token == null) {
-                System.out.println("No Token");
-                // CREATE ERROR CONTROLLER
+                try {
+                    throw new AppError("Please login and try again", "401");
+                } catch (AppError ex) {
+                    Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", ex);
+                }
                 return;
             }
             // Create better error handling 
-            decodeJWT(token.toString());
-        } catch (NullPointerException e) {
-            e.printStackTrace();
+            try{
+                decodeJWT(token.toString());
+            }catch(MalformedJwtException ex){
+                Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", ex);
+            }
+            
+        } catch (NullPointerException ex) {
+            Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
     }
 
