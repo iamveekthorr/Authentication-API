@@ -5,6 +5,7 @@
  */
 package services;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
@@ -16,6 +17,7 @@ import java.security.Key;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Level;
@@ -27,6 +29,7 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.DatatypeConverter;
+import models.UserModel;
 import org.json.simple.JSONObject;
 import utils.AppError;
 
@@ -46,16 +49,6 @@ public class AuthenticationService {
         } catch (IOException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
-    }
-
-    private static String removeFirstAndLast(String str) {
-
-        // Removing first and last character
-        // of a string using substring() method
-        str = str.substring(1, str.length() - 1);
-
-        // Return the modified string
-        return str;
     }
 
     // Sign user token based on currently logged in user 
@@ -112,14 +105,43 @@ public class AuthenticationService {
 
     public void login(HttpServletRequest req, HttpServletResponse res) {
         Object token;
+        List<UserModel> user = null;
+        String email, password;
 
         try {
+
+            ObjectMapper objectMapper = new ObjectMapper();
+
             // Destructure JSON Object from request body 
-            String[] reqBody = removeFirstAndLast(req.getReader().lines().collect(Collectors.joining())).split(",");
-            String[] name = reqBody[0].split(":");
-            String[] password = reqBody[1].split(":");
-            System.out.println("Name: " + name[1]);
-            System.out.println("password: " + password[1]);
+            // 1) Get the request body 
+            String reqBody = req.getReader().lines().collect(Collectors.joining());
+            Map<String, Object> userObject = objectMapper.readValue(reqBody, Map.class);
+
+            email = (String) userObject.get("email");
+            password = (String) userObject.get("password");
+
+            // Check fields for null values
+            if (email == null || password == null) {
+                // Throw error if the values are not found 
+                try {
+                    throw new AppError("Email and Password are both required", 400);
+                } catch (AppError ex) {
+                    Logger.getLogger(AuthenticationService.class.getName()).log(Level.SEVERE, ex.getMessage(), ex);
+                }
+                return;
+            }
+            // 2( Check if user exists and password is correct 
+            Object currentUser = new UserService().getByEmail(email);
+            if (currentUser == null) {
+                try {
+                    System.out.print("No user found");
+                    throw new AppError("Email and Password are both required", 400);
+                } catch (AppError ex) {
+                    Logger.getLogger(AuthenticationService.class.getName()).log(Level.SEVERE, ex.getMessage(), ex);
+                }
+                return;
+            }
+            System.out.println("Email " + email + "\nPassword " + password);
 
             // Create JSONWebToken
             token = createJWT("USER1", "Devthorr", "Jane Doe", 1000000);
@@ -166,9 +188,9 @@ public class AuthenticationService {
 
             if (token == null) {
                 try {
-                    throw new AppError("Please login and try again", "401");
+                    throw new AppError("Please login and try again", 401);
                 } catch (AppError ex) {
-                    Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", ex);
+                    Logger.getAnonymousLogger().log(Level.SEVERE, ex.getMessage(), ex.getCause());
                 }
                 return;
             }
@@ -178,7 +200,7 @@ public class AuthenticationService {
                 System.out.println("Current User: ".concat((String) currentUser));
                 if (currentUser == null) {
                     try {
-                        throw new AppError("This user does not exist", "401");
+                        throw new AppError("This user does not exist", 401);
                     } catch (AppError ex) {
                         Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", ex);
                     }
