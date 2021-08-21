@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package controllers;
+package services;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtBuilder;
@@ -13,12 +13,15 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.Key;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
@@ -31,18 +34,28 @@ import utils.AppError;
  *
  * @author Victor Okonkwo
  */
-public class AuthenticationContoller {
+public class AuthenticationService {
 
     private static InputStream reader;
     public static Properties properties = new Properties();
 
-    public AuthenticationContoller() {
+    public AuthenticationService() {
         try {
             reader = Thread.currentThread().getContextClassLoader().getResourceAsStream("config.properties");
             properties.load(reader);
         } catch (IOException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
+    }
+
+    private static String removeFirstAndLast(String str) {
+
+        // Removing first and last character
+        // of a string using substring() method
+        str = str.substring(1, str.length() - 1);
+
+        // Return the modified string
+        return str;
     }
 
     // Sign user token based on currently logged in user 
@@ -97,13 +110,23 @@ public class AuthenticationContoller {
         return null;
     }
 
-    void login(HttpServletRequest req, HttpServletResponse res) {
+    public void login(HttpServletRequest req, HttpServletResponse res) {
         Object token;
 
-        token = createJWT("USER1", "Devthorr", "Jane Doe", 1000000);
-        Cookie cookie = new Cookie("jwt", token.toString());
-        res.addCookie(cookie);
         try {
+            // Destructure JSON Object from request body 
+            String[] reqBody = removeFirstAndLast(req.getReader().lines().collect(Collectors.joining())).split(",");
+            String[] name = reqBody[0].split(":");
+            String[] password = reqBody[1].split(":");
+            System.out.println("Name: " + name[1]);
+            System.out.println("password: " + password[1]);
+
+            // Create JSONWebToken
+            token = createJWT("USER1", "Devthorr", "Jane Doe", 1000000);
+            // Create new Cookie  
+            Cookie cookie = new Cookie("jwt", token.toString());
+            // Add token to cookie
+            res.addCookie(cookie);
             JSONObject obj = new JSONObject();
             obj.put("token", token);
             res.setContentType("application/json");
@@ -114,7 +137,7 @@ public class AuthenticationContoller {
         }
     }
 
-    void logOut(HttpServletRequest req, HttpServletResponse res) {
+    public void logOut(HttpServletRequest req, HttpServletResponse res) {
         Object token = "LoggedOut";
         Cookie cookie = new Cookie("jwt", token.toString());
         cookie.setMaxAge(0);
@@ -150,12 +173,20 @@ public class AuthenticationContoller {
                 return;
             }
             // Create better error handling 
-            try{
-                decodeJWT(token.toString());
-            }catch(MalformedJwtException ex){
+            try {
+                Object currentUser = decodeJWT(token.toString()).getId();
+                System.out.println("Current User: ".concat((String) currentUser));
+                if (currentUser == null) {
+                    try {
+                        throw new AppError("This user does not exist", "401");
+                    } catch (AppError ex) {
+                        Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", ex);
+                    }
+                }
+            } catch (MalformedJwtException ex) {
                 Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", ex);
             }
-            
+
         } catch (NullPointerException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }

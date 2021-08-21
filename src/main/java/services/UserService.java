@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package controllers;
+package services;
 
 import dao.UserDao;
 
@@ -11,16 +11,10 @@ import dao.UserDao;
  *
  * @author Victor Okonkwo
  */
-public class UserController {
+public class UserService {
     
-    public UserController() {
+    public UserService() {
         
-    }
-    
-    
-    void printStuff(){
-        UserDao userDao = new UserDao();
-        System.out.println("Dao " + userDao);
     }
     
     

@@ -5,8 +5,8 @@
  */
 package controllers;
 
+import services.AuthenticationService;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.servlet.ServletException;
@@ -27,25 +27,15 @@ public class LogInServlet extends HttpServlet {
      * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
      * methods.
      *
-     * @param request servlet request
-     * @param response servlet response
+     * @param req servlet request
+     * @param res servlet response
      * @throws ServletException if a servlet-specific error occurs
      * @throws IOException if an I/O error occurs
      */
     protected void processPostRequest(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
-        try {
-            
-           AuthenticationContoller authController = new AuthenticationContoller();
-           authController.login(req, res);
-           new UserController().printStuff();
-           Object[] reqBodyArr = req.getReader().lines().toArray();
-            for (Object reqBodyArr1 : reqBodyArr) {
-                System.out.println(reqBodyArr1);
-            }
-        } catch (IOException ex) {
-            Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
-        }
+           AuthenticationService authService = new AuthenticationService();
+           authService.login(req, res);
 
     }
 
@@ -53,8 +43,8 @@ public class LogInServlet extends HttpServlet {
         try {
             req.getRequestDispatcher("/sign-in.jsp").forward(req, res);
             res.setContentType("text/html;charset=UTF-8");
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (IOException | ServletException ex) {
+            Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
     }
 

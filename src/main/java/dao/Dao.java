@@ -6,7 +6,6 @@
 package dao;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  *
@@ -14,7 +13,7 @@ import java.util.Optional;
  * @param <Model>
  */
 public interface Dao <Model>{
-    Optional<Model> getById(long id);
+    Model getById(int id);
     
     List<Model> getAll();
     
@@ -23,4 +22,27 @@ public interface Dao <Model>{
     public void update(Model m, String...params);
     
     public void delete(Model m);
+    
+    /**Connection con;    
+      *ResultSet rs;    
+      * PreparedStatement stmt;    
+      * public Employee[] findAll() throws SQLException {   
+      *     Employee[] employees;       
+      *     String SQL_QUERY= “Select * from Employee”;        
+      *     con=ResourceManager.getConnection();        
+      *     stmt = con.prepareStatement(SQL_QUERY);        
+      *     rs = stmt.executeQuery();       
+      *     while(rs.next) {           
+      *         //get columns and store in array       
+      *     }        
+      *     return employees;   
+      * }   
+      * public Employee findByPK(EmployeePK) throws SQL Exception {       //Implementation code   }    
+      * public Employee[] findbyemployeename(String EmployeeName) throws SQLException{       //Implementation code    }    
+      * public boolean insert(Employee employee) throws SQLException{        //Implementation code    }    
+      * public boolean update(Employee employee) throws SQLException{   
+      * //Implementation code    }    
+      * public boolean delete(Employee employee) throws SQLException{        //Implementation code     }}
+     
+     */
 }

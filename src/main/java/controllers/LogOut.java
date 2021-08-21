@@ -5,6 +5,7 @@
  */
 package controllers;
 
+import services.AuthenticationService;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -23,8 +24,8 @@ public class LogOut extends HttpServlet {
 
     protected void processGetRequest(HttpServletRequest req, HttpServletResponse res) {
         try {
-            AuthenticationContoller authController = new AuthenticationContoller();
-            authController.logOut(req, res);
+            AuthenticationService authService = new AuthenticationService();
+            authService.logOut(req, res);
         } catch (Exception ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
