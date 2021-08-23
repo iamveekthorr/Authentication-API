@@ -17,11 +17,6 @@ public class UserModel {
     String email;
     private long id;
     
-    
-    public String getEmail(String mail) {
-        return email;
-    }
-
     public void setEmail(String email) {
         this.email = email;
     }
@@ -36,6 +31,10 @@ public class UserModel {
 
     public void setUserName(String userName) {
         this.userName = userName;
+    }
+
+    public String getEmail() {
+        return email;
     }
 
     public String getPassword() {

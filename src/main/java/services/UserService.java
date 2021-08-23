@@ -9,7 +9,9 @@ import dao.ConnectionDao;
 import dao.UserDao;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -21,7 +23,8 @@ import models.UserModel;
  */
 public class UserService implements UserDao{
     
-    List<UserModel> users;
+    private static List<UserModel> users;
+    private static ResultSet user;
     public UserService() {
     }
     @Override
@@ -37,7 +40,7 @@ public class UserService implements UserDao{
 
     @Override
     public void delete(UserModel m) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
@@ -60,17 +63,25 @@ public class UserService implements UserDao{
     }
 
     @Override
-    public String getByEmail(String email) {
+    public String getByEmail(String email, String password) {
         Connection conn = ConnectionDao.createConnection();
-        String sql = "SELECT * FROM users WHERE email = ?";
+        UserModel model = new UserModel();
+        String sql = "SELECT email, password FROM users WHERE email = ? AND password = ?";
         try {
             PreparedStatement statement = conn.prepareStatement(sql);
-            statement.execute();
-            return users.get(0).getEmail(email);
+            users = new ArrayList<>();
+            statement.setString(1, email);
+            statement.setString(2, password);
+            user = statement.executeQuery();
+            while(user.next()){
+                model.setEmail(email);
+                users.add(model);
+                return users.get(0).toString();
+            }
         } catch (SQLException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "SQL Exception", ex);
         }
-        return users.get(0).getEmail(email);
+        return null;
     }
     
     

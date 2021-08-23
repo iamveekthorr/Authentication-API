@@ -24,7 +24,8 @@ public class ConnectionDao extends DaoFactory {
     public static Connection createConnection() {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
-            DATABASE_CONNECTION = DriverManager.getConnection(AuthenticationService.properties.getProperty("DATABASE_URL"),
+            DATABASE_CONNECTION = DriverManager.getConnection(AuthenticationService.properties.getProperty("DATABASE_URL")
+                    .concat(AuthenticationService.properties.getProperty("TIME_ZONE")),
                     AuthenticationService.properties.getProperty("DATABASE_USER"),
                     AuthenticationService.properties.getProperty("DATABASE_PASSWORD"));
             return DATABASE_CONNECTION;

@@ -14,22 +14,18 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.Key;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.DatatypeConverter;
-import models.UserModel;
 import org.json.simple.JSONObject;
 import utils.AppError;
 
@@ -105,7 +101,6 @@ public class AuthenticationService {
 
     public void login(HttpServletRequest req, HttpServletResponse res) {
         Object token;
-        List<UserModel> user = null;
         String email, password;
 
         try {
@@ -119,7 +114,6 @@ public class AuthenticationService {
 
             email = (String) userObject.get("email");
             password = (String) userObject.get("password");
-
             // Check fields for null values
             if (email == null || password == null) {
                 // Throw error if the values are not found 
@@ -130,18 +124,16 @@ public class AuthenticationService {
                 }
                 return;
             }
-            // 2( Check if user exists and password is correct 
-            Object currentUser = new UserService().getByEmail(email);
+            // 2) Check if user exists and password is correct 
+            Object currentUser = new UserService().getByEmail(email, password);
             if (currentUser == null) {
                 try {
-                    System.out.print("No user found");
-                    throw new AppError("Email and Password are both required", 400);
+                    throw new AppError("Incorrect login Credentials. Please check email or password", 401);
                 } catch (AppError ex) {
                     Logger.getLogger(AuthenticationService.class.getName()).log(Level.SEVERE, ex.getMessage(), ex);
                 }
                 return;
             }
-            System.out.println("Email " + email + "\nPassword " + password);
 
             // Create JSONWebToken
             token = createJWT("USER1", "Devthorr", "Jane Doe", 1000000);

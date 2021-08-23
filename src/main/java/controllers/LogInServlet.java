@@ -36,7 +36,6 @@ public class LogInServlet extends HttpServlet {
             throws ServletException, IOException {
            AuthenticationService authService = new AuthenticationService();
            authService.login(req, res);
-
     }
 
     protected void processGetRequest(HttpServletRequest req, HttpServletResponse res) {

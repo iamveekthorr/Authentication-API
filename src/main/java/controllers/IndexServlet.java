@@ -65,7 +65,7 @@ public class IndexServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
-        processRequest(req, res);
+//        processRequest(req, res);
     }
 
     /**
