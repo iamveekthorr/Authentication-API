@@ -26,8 +26,10 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.DatatypeConverter;
+import models.UserModel;
 import org.json.simple.JSONObject;
 import utils.AppError;
+import utils.PropLoader;
 
 /**
  *
@@ -35,16 +37,8 @@ import utils.AppError;
  */
 public class AuthenticationService {
 
-    private static InputStream reader;
-    public static Properties properties = new Properties();
-
     public AuthenticationService() {
-        try {
-            reader = Thread.currentThread().getContextClassLoader().getResourceAsStream("config.properties");
-            properties.load(reader);
-        } catch (IOException ex) {
-            Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
-        }
+        
     }
 
     // Sign user token based on currently logged in user 
@@ -65,8 +59,7 @@ public class AuthenticationService {
         Date now = new Date(nowMillis);
 
         // We will sign our JWT with our ApiKey secret
-        byte[] apiKeySecretBytes = DatatypeConverter.parseBase64Binary(
-                properties.getProperty("SECERET_KEY"));
+        byte[] apiKeySecretBytes = DatatypeConverter.parseBase64Binary(PropLoader.loadPropertiesFile().getProperty("SECERET_KEY"));
         Key signingKey = new SecretKeySpec(apiKeySecretBytes, signatureAlgorithm.getJcaName());
 
         // Let's set the JWT Claims
@@ -89,8 +82,7 @@ public class AuthenticationService {
         // This line will throw an exception if it is not a signed JWS (as expected
         Claims claims;
         try {
-            claims = Jwts.parserBuilder().setSigningKey(DatatypeConverter.parseBase64Binary(
-                    properties.getProperty("SECERET_KEY")))
+            claims = Jwts.parserBuilder().setSigningKey(DatatypeConverter.parseBase64Binary(PropLoader.loadPropertiesFile().getProperty("SECERET_KEY")))
                     .build().parseClaimsJws(jwt).getBody();
             return claims;
         } catch (MalformedJwtException ex) {
@@ -102,6 +94,7 @@ public class AuthenticationService {
     public void login(HttpServletRequest req, HttpServletResponse res) {
         Object token;
         String email, password;
+        UserService currentUser;
 
         try {
 
@@ -110,11 +103,13 @@ public class AuthenticationService {
             // Destructure JSON Object from request body 
             // 1) Get the request body 
             String reqBody = req.getReader().lines().collect(Collectors.joining());
+            // 1a)Read the request body
             Map<String, Object> userObject = objectMapper.readValue(reqBody, Map.class);
 
             email = (String) userObject.get("email");
             password = (String) userObject.get("password");
-            // Check fields for null values
+            
+            // 1b) Check fields for null values in request bidy
             if (email == null || password == null) {
                 // Throw error if the values are not found 
                 try {
@@ -125,8 +120,11 @@ public class AuthenticationService {
                 return;
             }
             // 2) Check if user exists and password is correct 
-            Object currentUser = new UserService().getByEmail(email, password);
-            if (currentUser == null) {
+            currentUser = new UserService();
+            
+            // 2a) Get model from Service
+            UserModel userModel = currentUser.getByEmail(email, password);
+            if (userModel == null) {
                 try {
                     throw new AppError("Incorrect login Credentials. Please check email or password", 401);
                 } catch (AppError ex) {
@@ -134,18 +132,23 @@ public class AuthenticationService {
                 }
                 return;
             }
-
-            // Create JSONWebToken
-            token = createJWT("USER1", "Devthorr", "Jane Doe", 1000000);
-            // Create new Cookie  
+            
+            // 2b) Create JSONWebToken
+            token = createJWT(String.valueOf(userModel.getID()), 
+                    PropLoader.loadPropertiesFile().getProperty("JWT_ISSUER"), 
+                    userModel.getUserName(), 1000000);
+            
+            // 3) Create new Cookie  
             Cookie cookie = new Cookie("jwt", token.toString());
-            // Add token to cookie
+            // 3a) Add token to cookie
             res.addCookie(cookie);
-            JSONObject obj = new JSONObject();
-            obj.put("token", token);
+            // 3b) Create JSON response object  
+            JSONObject responseOobj = new JSONObject();
+            responseOobj.put("token", token);
             res.setContentType("application/json");
             res.setCharacterEncoding("UTF-8");
-            res.getWriter().write(obj.toJSONString());
+            res.getWriter().write(responseOobj.toJSONString());
+            
         } catch (IOException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
@@ -186,10 +189,9 @@ public class AuthenticationService {
                 }
                 return;
             }
-            // Create better error handling 
+            
             try {
                 Object currentUser = decodeJWT(token.toString()).getId();
-                System.out.println("Current User: ".concat((String) currentUser));
                 if (currentUser == null) {
                     try {
                         throw new AppError("This user does not exist", 401);

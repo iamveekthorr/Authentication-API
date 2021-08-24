@@ -24,5 +24,5 @@ public interface UserDao{
     
     public void delete(UserModel m);
     
-    public String getByEmail(String email, String password);
+    public UserModel getByEmail(String email, String password);
 }

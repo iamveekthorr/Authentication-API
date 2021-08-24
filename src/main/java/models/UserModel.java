@@ -15,13 +15,17 @@ public class UserModel {
     String userName;
     String password;
     String email;
-    private long id;
+    private int id;
+
+    public void setID(int id) {
+        this.id = id;
+    }
     
     public void setEmail(String email) {
         this.email = email;
     }
 
-    public long getId() {
+    public int getID() {
         return id;
     }
 

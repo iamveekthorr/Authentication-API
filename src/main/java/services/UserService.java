@@ -46,15 +46,23 @@ public class UserService implements UserDao{
     @Override
     public UserModel getById(int id) {
         Connection conn = ConnectionDao.createConnection();
+        UserModel model = new UserModel();
+        users = new ArrayList<>();
         String sql = "SELECT * FROM users WHERE ID = ?";
         try {
             PreparedStatement statement = conn.prepareStatement(sql);
             statement.execute();
-            return users.get(id);
+            statement.setInt(1, id);
+            user = statement.executeQuery();
+            while(user.next()){
+                model.setID(user.getInt("_id"));
+                users.add(model);
+                return users.get(0);
+            }
         } catch (SQLException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "SQL Exception", ex);
         }
-        return users.get(id);
+        return null;
     }
 
     @Override
@@ -63,10 +71,10 @@ public class UserService implements UserDao{
     }
 
     @Override
-    public String getByEmail(String email, String password) {
+    public UserModel getByEmail(String email, String password) {
         Connection conn = ConnectionDao.createConnection();
         UserModel model = new UserModel();
-        String sql = "SELECT email, password FROM users WHERE email = ? AND password = ?";
+        String sql = "SELECT * FROM users WHERE email = ? AND password = ?";
         try {
             PreparedStatement statement = conn.prepareStatement(sql);
             users = new ArrayList<>();
@@ -75,8 +83,10 @@ public class UserService implements UserDao{
             user = statement.executeQuery();
             while(user.next()){
                 model.setEmail(email);
+                model.setUserName(user.getString("name"));
+                model.setID(user.getInt("_id"));
                 users.add(model);
-                return users.get(0).toString();
+                return users.get(0);
             }
         } catch (SQLException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "SQL Exception", ex);
