@@ -6,7 +6,6 @@
 package dao;
 
 import java.util.List;
-import java.util.Optional;
 import models.UserModel;
 
 /**
@@ -19,7 +18,7 @@ public interface UserDao{
     
     List<UserModel> getAll();
     
-    public void save(UserModel m);
+    public boolean save(UserModel m);
     
     public boolean update(UserModel m, String...params);
     

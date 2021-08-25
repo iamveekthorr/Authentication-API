@@ -5,9 +5,6 @@
  */
 package models;
 
-import java.util.UUID;
-
-
 /**
  *
  * @author Victor Okonkwo

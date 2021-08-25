@@ -17,6 +17,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import models.UserModel;
+import org.mindrot.jbcrypt.BCrypt;
 
 /**
  *
@@ -26,30 +27,32 @@ public class UserService implements UserDao {
 
     private static List<UserModel> users;
     private static ResultSet user;
+    static final String SALT = BCrypt.gensalt(12);
 
     public UserService() {
     }
 
     @Override
-    public void save(UserModel model) {
+    public boolean save(UserModel model) {
         Connection conn = ConnectionDao.createConnection();
-        String sql = "INSERT INTO users(_id, firstName, lastName, email, password)"
-                + " VALUES(?,?,?,?,?)";
+        String sql = "INSERT INTO users(_id, firstName, lastName, email, password) VALUES(?,?,?,?,?)";
         try {
-            model.setID((UUID.randomUUID().toString()));
             PreparedStatement statement = conn.prepareStatement(sql);
+            System.out.println(statement);
+            model.setID((UUID.randomUUID().toString()));
+            System.out.println(model.getID());
             statement.setString(1, model.getID());
             statement.setString(2, model.getFirstName());
             statement.setString(3, model.getLastName());
             statement.setString(4, model.getEmail());
-            statement.setString(5, model.getPassword());
+            statement.setString(5, BCrypt.hashpw(model.getPassword(),SALT));
             statement.execute();
-            
-            System.out.println(model.getID());
             users.add(model);
+            return true;
         } catch (SQLException ex) {
             Logger.getLogger(UserService.class.getName()).log(Level.SEVERE, null, ex);
         }
+        return false;
     }
 
     @Override
@@ -104,7 +107,7 @@ public class UserService implements UserDao {
             // returns true if result of Query(sql) > 0
             while (user.next()) {
                 model.setEmail(email);
-                model.setFirstName(user.getString("name"));
+                model.setFirstName(user.getString("email"));
                 model.setID((String) user.getObject("_id"));
                 users.add(model);
                 return users.get(0);

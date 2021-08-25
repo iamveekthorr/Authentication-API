@@ -16,7 +16,6 @@ import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -125,7 +124,7 @@ public class AuthenticationService {
             }
             // 1c) Check length of password
             if (password.length() < 8) {
-                throw new AppError("All fields are required", 400);
+                throw new AppError("Password must be equal to more than 8 characters", 400);
             }
 
             // 1d) Compare passwords
@@ -139,15 +138,17 @@ public class AuthenticationService {
             // 2a) Get model from Service
             UserModel userModel = currentUser.getByEmail(email, " ");
             if (userModel != null) {
-                throw new AppError("Incorrect login Credentials. Please check email or password", 401);
+                throw new AppError("User already exists. Please login and try again", 401);
             }
+
             // 2c) Add fields to model using setters
             userModel = new UserModel();
-            userModel.setEmail(email);
+            userModel.setEmail(email);           
             userModel.setFirstName(firstName);
             userModel.setLastName(lastName);
             userModel.setPassword(password);
             currentUser.save(userModel);
+            
             // 2d) Create JSONWebToken
             token = createJWT(String.valueOf(userModel.getID()),
                     PropLoader.loadPropertiesFile().getProperty("JWT_ISSUER"),
@@ -158,10 +159,13 @@ public class AuthenticationService {
             res.addCookie(cookie);
             // 3b) Create JSON response object  
             JSONObject responseOobj = new JSONObject();
+            responseOobj.put("status", "success");
+            responseOobj.put("message", "User created successfully");
             responseOobj.put("token", token);
             res.setContentType("application/json");
             res.setCharacterEncoding("UTF-8");
             res.getWriter().write(responseOobj.toJSONString());
+
         } catch (IOException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         } catch (AppError ex) {
