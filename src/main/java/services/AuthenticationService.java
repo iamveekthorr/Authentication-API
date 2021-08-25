@@ -12,12 +12,11 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureAlgorithm;
 import java.io.IOException;
-import java.io.InputStream;
 import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
+import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -38,7 +37,7 @@ import utils.PropLoader;
 public class AuthenticationService {
 
     public AuthenticationService() {
-        
+
     }
 
     // Sign user token based on currently logged in user 
@@ -82,13 +81,92 @@ public class AuthenticationService {
         // This line will throw an exception if it is not a signed JWS (as expected
         Claims claims;
         try {
-            claims = Jwts.parserBuilder().setSigningKey(DatatypeConverter.parseBase64Binary(PropLoader.loadPropertiesFile().getProperty("SECERET_KEY")))
+            claims = Jwts.parserBuilder().setSigningKey(DatatypeConverter.parseBase64Binary(
+                    PropLoader.loadPropertiesFile().getProperty("SECERET_KEY")))
                     .build().parseClaimsJws(jwt).getBody();
             return claims;
         } catch (MalformedJwtException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
         return null;
+    }
+
+    public void signup(HttpServletRequest req, HttpServletResponse res) {
+        Object token;
+        String email, password, firstName, lastName, confirmPassword;
+        UserService currentUser;
+
+        try {
+
+            ObjectMapper objectMapper = new ObjectMapper();
+
+            // Destructure JSON Object from request body 
+            // 1) Get the request body 
+            String reqBody = req.getReader().lines().collect(Collectors.joining());
+            // 1a)Read the request body
+            Map<String, Object> userObject = objectMapper.readValue(reqBody, Map.class);
+
+            email = (String) userObject.get("email");
+            password = (String) userObject.get("password");
+            confirmPassword = (String) userObject.get("passwordConfirm");
+            firstName = (String) userObject.get("firstName");
+            lastName = (String) userObject.get("lastName");
+
+            // 1b) Check fields for null values in request bidy
+            if (email == null || password == null || confirmPassword == null
+                    || firstName == null || lastName == null) {
+                // Throw error if the values are not found 
+                try {
+                    throw new AppError("All fields are required", 400);
+                } catch (AppError ex) {
+                    Logger.getLogger(AuthenticationService.class.getName()).log(Level.SEVERE, ex.getMessage(), ex);
+                }
+                return;
+            }
+            // 1c) Check length of password
+            if (password.length() < 8) {
+                throw new AppError("All fields are required", 400);
+            }
+
+            // 1d) Compare passwords
+            if (!password.equalsIgnoreCase(confirmPassword)) {
+                throw new AppError("Password Mismatch", 0);
+            }
+
+            // 2) Check if user exists in the database  
+            currentUser = new UserService();
+
+            // 2a) Get model from Service
+            UserModel userModel = currentUser.getByEmail(email, " ");
+            if (userModel != null) {
+                throw new AppError("Incorrect login Credentials. Please check email or password", 401);
+            }
+            // 2c) Add fields to model using setters
+            userModel = new UserModel();
+            userModel.setEmail(email);
+            userModel.setFirstName(firstName);
+            userModel.setLastName(lastName);
+            userModel.setPassword(password);
+            currentUser.save(userModel);
+            // 2d) Create JSONWebToken
+            token = createJWT(String.valueOf(userModel.getID()),
+                    PropLoader.loadPropertiesFile().getProperty("JWT_ISSUER"),
+                    firstName.concat(" ").concat(lastName), 1000000);
+            // 3) Create new Cookie  
+            Cookie cookie = new Cookie("jwt", token.toString());
+            // 3a) Add token to cookie
+            res.addCookie(cookie);
+            // 3b) Create JSON response object  
+            JSONObject responseOobj = new JSONObject();
+            responseOobj.put("token", token);
+            res.setContentType("application/json");
+            res.setCharacterEncoding("UTF-8");
+            res.getWriter().write(responseOobj.toJSONString());
+        } catch (IOException ex) {
+            Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
+        } catch (AppError ex) {
+            Logger.getLogger(AuthenticationService.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     public void login(HttpServletRequest req, HttpServletResponse res) {
@@ -108,7 +186,7 @@ public class AuthenticationService {
 
             email = (String) userObject.get("email");
             password = (String) userObject.get("password");
-            
+
             // 1b) Check fields for null values in request bidy
             if (email == null || password == null) {
                 // Throw error if the values are not found 
@@ -121,7 +199,7 @@ public class AuthenticationService {
             }
             // 2) Check if user exists and password is correct 
             currentUser = new UserService();
-            
+
             // 2a) Get model from Service
             UserModel userModel = currentUser.getByEmail(email, password);
             if (userModel == null) {
@@ -132,12 +210,12 @@ public class AuthenticationService {
                 }
                 return;
             }
-            
+
             // 2b) Create JSONWebToken
-            token = createJWT(String.valueOf(userModel.getID()), 
-                    PropLoader.loadPropertiesFile().getProperty("JWT_ISSUER"), 
-                    userModel.getUserName(), 1000000);
-            
+            token = createJWT(String.valueOf(userModel.getID()),
+                    PropLoader.loadPropertiesFile().getProperty("JWT_ISSUER"),
+                    userModel.getFirstName(), 1000000);
+
             // 3) Create new Cookie  
             Cookie cookie = new Cookie("jwt", token.toString());
             // 3a) Add token to cookie
@@ -148,7 +226,7 @@ public class AuthenticationService {
             res.setContentType("application/json");
             res.setCharacterEncoding("UTF-8");
             res.getWriter().write(responseOobj.toJSONString());
-            
+
         } catch (IOException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
@@ -189,7 +267,7 @@ public class AuthenticationService {
                 }
                 return;
             }
-            
+
             try {
                 Object currentUser = decodeJWT(token.toString()).getId();
                 if (currentUser == null) {
