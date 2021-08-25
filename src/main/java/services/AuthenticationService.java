@@ -16,6 +16,7 @@ import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -57,7 +58,8 @@ public class AuthenticationService {
         Date now = new Date(nowMillis);
 
         // We will sign our JWT with our ApiKey secret
-        byte[] apiKeySecretBytes = DatatypeConverter.parseBase64Binary(PropLoader.loadPropertiesFile().getProperty("SECERET_KEY"));
+        byte[] apiKeySecretBytes = DatatypeConverter.parseBase64Binary(PropLoader.loadPropertiesFile()
+                .getProperty("SECERET_KEY"));
         Key signingKey = new SecretKeySpec(apiKeySecretBytes, signatureAlgorithm.getJcaName());
 
         // Let's set the JWT Claims
@@ -136,19 +138,19 @@ public class AuthenticationService {
             currentUser = new UserService();
 
             // 2a) Get model from Service
-            UserModel userModel = currentUser.getByEmail(email, " ");
+            UserModel userModel = currentUser.getByEmail(email, Optional.empty());
             if (userModel != null) {
                 throw new AppError("User already exists. Please login and try again", 401);
             }
 
             // 2c) Add fields to model using setters
             userModel = new UserModel();
-            userModel.setEmail(email);           
+            userModel.setEmail(email);
             userModel.setFirstName(firstName);
             userModel.setLastName(lastName);
             userModel.setPassword(password);
             currentUser.save(userModel);
-            
+
             // 2d) Create JSONWebToken
             token = createJWT(String.valueOf(userModel.getID()),
                     PropLoader.loadPropertiesFile().getProperty("JWT_ISSUER"),
@@ -205,7 +207,7 @@ public class AuthenticationService {
             currentUser = new UserService();
 
             // 2a) Get model from Service
-            UserModel userModel = currentUser.getByEmail(email, password);
+            UserModel userModel = currentUser.getByEmail(email, Optional.of(password));
             if (userModel == null) {
                 try {
                     throw new AppError("Incorrect login Credentials. Please check email or password", 401);

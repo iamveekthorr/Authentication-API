@@ -13,6 +13,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -38,14 +39,12 @@ public class UserService implements UserDao {
         String sql = "INSERT INTO users(_id, firstName, lastName, email, password) VALUES(?,?,?,?,?)";
         try {
             PreparedStatement statement = conn.prepareStatement(sql);
-            System.out.println(statement);
             model.setID((UUID.randomUUID().toString()));
-            System.out.println(model.getID());
             statement.setString(1, model.getID());
             statement.setString(2, model.getFirstName());
             statement.setString(3, model.getLastName());
             statement.setString(4, model.getEmail());
-            statement.setString(5, BCrypt.hashpw(model.getPassword(),SALT));
+            statement.setString(5, BCrypt.hashpw(model.getPassword(), SALT));
             statement.execute();
             users.add(model);
             return true;
@@ -91,23 +90,44 @@ public class UserService implements UserDao {
     }
 
     @Override
-    public UserModel getByEmail(String email, String password) {
+    public UserModel getByEmail(String email, Optional<String> password) {
+        // 1a) Create connection to database
         Connection conn = ConnectionDao.createConnection();
         UserModel model = new UserModel();
-        String sql = password.equalsIgnoreCase(" ") ? "SELECT * FROM users WHERE email = ?"
-                : "SELECT * FROM users WHERE email = ? AND password = ?";
+        users = new ArrayList<>();
+        
+        // 1b) create Query(sql) 
+        String sql = "SELECT * FROM users WHERE email = ?";
+        
         try {
             PreparedStatement statement = conn.prepareStatement(sql);
-            users = new ArrayList<>();
             statement.setString(1, email);
-            if (!password.equalsIgnoreCase(" ")) {
-                statement.setString(2, password);
-            }
+            // 2a) Execute Query and assign (Returns a ResultSet)
             user = statement.executeQuery();
+            
+            // 2b) Check if password is present in the parameter list 
+            /** If password is present then compare plain password to the 
+            stored password in the database. 
+            
+            ONLY RUNS FOR CHECKING IF USER EXIST BEFORE CREATING AND ACCOUNT.
+            TO AVOID DUPLICATE FIELDS IN THE DATABASE **/
+            if (password.isPresent()) {
+                // Runs as long as ResultSet is > 0
+                while (user.next()) {
+                    // 2c) Compare plain user password with the stored password in the database
+                    if (BCrypt.checkpw(password.get(), user.getString("password"))) {
+                        model.setEmail(email);
+                        users.add(model);
+                        // returns the user found 
+                        return users.get(0);
+                    }
+                }
+                return null;
+            }
             // returns true if result of Query(sql) > 0
             while (user.next()) {
                 model.setEmail(email);
-                model.setFirstName(user.getString("email"));
+                model.setFirstName(user.getString("firstName"));
                 model.setID((String) user.getObject("_id"));
                 users.add(model);
                 return users.get(0);
