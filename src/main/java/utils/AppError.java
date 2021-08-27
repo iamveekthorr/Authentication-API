@@ -5,19 +5,20 @@
  */
 package utils;
 
+import javax.servlet.http.HttpServletResponse;
+
 /**
  *
  * @author Victor Okonkwo
  */
 public class AppError extends Exception {
-    int statusCode;
+    HttpServletResponse statusCode;
     Object status;
     Boolean isOperational;
-    public AppError(String message, int statusCode) {
+    public AppError(String message, HttpServletResponse statusCode) {
         super(message);
         this.statusCode = statusCode;
-        int stat = Integer.parseInt(Integer.toString(statusCode).substring(0, 1));
-        this.status = String.valueOf(stat).startsWith("4") ? "Fail" : "Success";
+        this.status = String.valueOf(statusCode.getStatus()).startsWith("4") ? "Fail" : "Success";
         this.isOperational = true;
         
         super.getStackTrace();

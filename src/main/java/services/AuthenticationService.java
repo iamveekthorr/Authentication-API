@@ -115,23 +115,43 @@ public class AuthenticationService {
 
             // 1b) Check fields for null values in request bidy
             if (email == null || password == null || confirmPassword == null
-                    || firstName == null || lastName == null) {
+                    || firstName == null || lastName == null
+                    || email.isBlank() || password.isBlank() || confirmPassword.isBlank()
+                    || firstName.isBlank() || lastName.isBlank()) {
                 // Throw error if the values are not found 
                 try {
-                    throw new AppError("All fields are required", 400);
-                } catch (AppError ex) {
+                    res.setStatus(HttpServletResponse.SC_CONFLICT);
+                    JSONObject responseOobj = new JSONObject();
+                    responseOobj.put("status", "fail");
+                    responseOobj.put("message", "All fields are required");
+                    res.setContentType("application/json");
+                    res.setCharacterEncoding("UTF-8");
+                    res.getWriter().write(responseOobj.toJSONString());
+                    return;
+                } catch (IOException ex) {
                     Logger.getLogger(AuthenticationService.class.getName()).log(Level.SEVERE, ex.getMessage(), ex);
                 }
                 return;
             }
             // 1c) Check length of password
             if (password.length() < 8) {
-                throw new AppError("Password must be equal to more than 8 characters", 400);
+                throw new AppError("Password must be equal to more than 8 characters", res);
             }
 
             // 1d) Compare passwords
             if (!password.equalsIgnoreCase(confirmPassword)) {
-                throw new AppError("Password Mismatch", 0);
+                try {
+                    res.setStatus(HttpServletResponse.SC_CONFLICT);
+                    JSONObject responseOobj = new JSONObject();
+                    responseOobj.put("status", "fail");
+                    responseOobj.put("message", "Password Mismatch");
+                    res.setContentType("application/json");
+                    res.setCharacterEncoding("UTF-8");
+                    res.getWriter().write(responseOobj.toJSONString());
+                    return;
+                } catch (IOException ex) {
+                    Logger.getAnonymousLogger(AuthenticationService.class.getName()).log(Level.SEVERE, ex.getMessage(), ex);
+                }
             }
 
             // 2) Check if user exists in the database  
@@ -140,7 +160,14 @@ public class AuthenticationService {
             // 2a) Get model from Service
             UserModel userModel = currentUser.getByEmail(email, Optional.empty());
             if (userModel != null) {
-                throw new AppError("User already exists. Please login and try again", 401);
+                res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                JSONObject responseOobj = new JSONObject();
+                responseOobj.put("status", "fail");
+                responseOobj.put("message", "User already Exists");
+                res.setContentType("application/json");
+                res.setCharacterEncoding("UTF-8");
+                res.getWriter().write(responseOobj.toJSONString());
+                return;
             }
 
             // 2c) Add fields to model using setters
@@ -161,17 +188,26 @@ public class AuthenticationService {
             res.addCookie(cookie);
             // 3b) Create JSON response object  
             JSONObject responseOobj = new JSONObject();
+            
+            // 3c) create new user object to send to client 
+            Map<String, Object> newUserObject =  new HashMap<>();            
+            newUserObject.put("_id", userModel.getID());
+            newUserObject.put("firstName", userModel.getFirstName());
+            newUserObject.put("lastName", userModel.getLastName());
+            newUserObject.put("email", userModel.getEmail());
+            
+            // 4a) Create response object and send to client
             responseOobj.put("status", "success");
             responseOobj.put("message", "User created successfully");
             responseOobj.put("token", token);
+            responseOobj.put("data", newUserObject);
             res.setContentType("application/json");
             res.setCharacterEncoding("UTF-8");
+            
+            // 4b) Write object to client 
             res.getWriter().write(responseOobj.toJSONString());
-
-        } catch (IOException ex) {
+        } catch (AppError | IOException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
-        } catch (AppError ex) {
-            Logger.getLogger(AuthenticationService.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
@@ -179,6 +215,7 @@ public class AuthenticationService {
         Object token;
         String email, password;
         UserService currentUser;
+        JSONObject responseOobj;
 
         try {
 
@@ -194,10 +231,17 @@ public class AuthenticationService {
             password = (String) userObject.get("password");
 
             // 1b) Check fields for null values in request bidy
-            if (email == null || password == null) {
+            if (email == null || password == null || email.isBlank() || password.isBlank()) {
                 // Throw error if the values are not found 
                 try {
-                    throw new AppError("Email and Password are both required", 400);
+                    res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    responseOobj = new JSONObject();
+                    responseOobj.put("status", "fail");
+                    responseOobj.put("message", "Email and Password are both required");
+                    res.setContentType("application/json");
+                    res.setCharacterEncoding("UTF-8");
+                    res.getWriter().write(responseOobj.toJSONString());
+                    throw new AppError("Email and Password are both required", res);
                 } catch (AppError ex) {
                     Logger.getLogger(AuthenticationService.class.getName()).log(Level.SEVERE, ex.getMessage(), ex);
                 }
@@ -210,7 +254,14 @@ public class AuthenticationService {
             UserModel userModel = currentUser.getByEmail(email, Optional.of(password));
             if (userModel == null) {
                 try {
-                    throw new AppError("Incorrect login Credentials. Please check email or password", 401);
+                    res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    responseOobj = new JSONObject();
+                    responseOobj.put("status", "fail");
+                    responseOobj.put("message", "Email and Password are both required");
+                    res.setContentType("application/json");
+                    res.setCharacterEncoding("UTF-8");
+                    res.getWriter().write(responseOobj.toJSONString());
+                    throw new AppError("Incorrect login Credentials. Please check email or password", res);
                 } catch (AppError ex) {
                     Logger.getLogger(AuthenticationService.class.getName()).log(Level.SEVERE, ex.getMessage(), ex);
                 }
@@ -226,9 +277,20 @@ public class AuthenticationService {
             Cookie cookie = new Cookie("jwt", token.toString());
             // 3a) Add token to cookie
             res.addCookie(cookie);
+            
+            // 3a) Create user object
+            Map<String, Object> newUserObject =  new HashMap<>();            
+            newUserObject.put("_id", userModel.getID());
+            newUserObject.put("firstName", userModel.getFirstName());
+            newUserObject.put("lastName", userModel.getLastName());
+            newUserObject.put("email", userModel.getEmail());
+            
             // 3b) Create JSON response object  
-            JSONObject responseOobj = new JSONObject();
+            responseOobj = new JSONObject();
             responseOobj.put("token", token);
+            responseOobj.put("status", "success");
+            responseOobj.put("message", "user successfuly logged in");
+            responseOobj.put("data", newUserObject);
             res.setContentType("application/json");
             res.setCharacterEncoding("UTF-8");
             res.getWriter().write(responseOobj.toJSONString());
@@ -267,7 +329,7 @@ public class AuthenticationService {
 
             if (token == null) {
                 try {
-                    throw new AppError("Please login and try again", 401);
+                    throw new AppError("Please login and try again", res);
                 } catch (AppError ex) {
                     Logger.getAnonymousLogger().log(Level.SEVERE, ex.getMessage(), ex.getCause());
                 }
@@ -278,7 +340,7 @@ public class AuthenticationService {
                 Object currentUser = decodeJWT(token.toString()).getId();
                 if (currentUser == null) {
                     try {
-                        throw new AppError("This user does not exist", 401);
+                        throw new AppError("This user does not exist", res);
                     } catch (AppError ex) {
                         Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", ex);
                     }

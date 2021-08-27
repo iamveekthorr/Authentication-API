@@ -95,28 +95,32 @@ public class UserService implements UserDao {
         Connection conn = ConnectionDao.createConnection();
         UserModel model = new UserModel();
         users = new ArrayList<>();
-        
+
         // 1b) create Query(sql) 
         String sql = "SELECT * FROM users WHERE email = ?";
-        
+
         try {
             PreparedStatement statement = conn.prepareStatement(sql);
             statement.setString(1, email);
             // 2a) Execute Query and assign (Returns a ResultSet)
             user = statement.executeQuery();
-            
+
             // 2b) Check if password is present in the parameter list 
-            /** If password is present then compare plain password to the 
-            stored password in the database. 
-            
-            ONLY RUNS FOR CHECKING IF USER EXIST BEFORE CREATING AND ACCOUNT.
-            TO AVOID DUPLICATE FIELDS IN THE DATABASE **/
+            /**
+             * If password is present then compare plain password to the stored
+             * password in the database. * ONLY RUNS FOR CHECKING IF USER EXIST
+             * BEFORE CREATING AND ACCOUNT. TO AVOID DUPLICATE FIELDS IN THE
+             * DATABASE AND LOGGIN IN A USER*
+             */
             if (password.isPresent()) {
                 // Runs as long as ResultSet is > 0
                 while (user.next()) {
                     // 2c) Compare plain user password with the stored password in the database
                     if (BCrypt.checkpw(password.get(), user.getString("password"))) {
                         model.setEmail(email);
+                        model.setFirstName(user.getString("firstName"));
+                        model.setLastName(user.getString("lastName"));
+                        model.setID((String) user.getObject("_id"));
                         users.add(model);
                         // returns the user found 
                         return users.get(0);
@@ -125,10 +129,9 @@ public class UserService implements UserDao {
                 return null;
             }
             // returns true if result of Query(sql) > 0
+            /* ONLY RUNS FOR SIGN-UP */
             while (user.next()) {
                 model.setEmail(email);
-                model.setFirstName(user.getString("firstName"));
-                model.setID((String) user.getObject("_id"));
                 users.add(model);
                 return users.get(0);
             }

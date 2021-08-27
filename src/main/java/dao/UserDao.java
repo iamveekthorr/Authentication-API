@@ -6,12 +6,12 @@
 package dao;
 
 import java.util.List;
+import java.util.Optional;
 import models.UserModel;
 
 /**
  *
  * @author Victor Okonkwo
- * @param <Model>
  */
 public interface UserDao{
     UserModel getById(int id);
@@ -24,5 +24,5 @@ public interface UserDao{
     
     public void delete(UserModel m);
     
-    public UserModel getByEmail(String email);
+    public UserModel getByEmail(String email, Optional<String> password);
 }
