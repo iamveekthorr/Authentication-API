@@ -108,7 +108,7 @@ public class UserService implements UserDao {
             // 2b) Check if password is present in the parameter list 
             /**
              * If password is present then compare plain password to the stored
-             * password in the database. * ONLY RUNS FOR CHECKING IF USER EXIST
+             * password in the database. *FOR CHECKING IF USER EXIST
              * BEFORE CREATING AND ACCOUNT. TO AVOID DUPLICATE FIELDS IN THE
              * DATABASE AND LOGGIN IN A USER*
              */
