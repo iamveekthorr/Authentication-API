@@ -50,6 +50,15 @@ public class ErrorController extends HttpServlet {
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             }
 
+            if (getErrorCode(request) == 500) {
+                System.out.println(throwable);
+                responseOobj.put("status", "Error");
+                responseOobj.put("message", "Something went very wrong");
+                response.getWriter().write(responseOobj.toJSONString());
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", throwable.getStackTrace());
+            }
+            
             if (throwable != null) {
                 if (throwable instanceof ServletException) {
                     Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", throwable);
@@ -71,22 +80,15 @@ public class ErrorController extends HttpServlet {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 }
             }
-
-            if (getErrorCode(request) == 500) {
-                System.out.println(throwable);
-                responseOobj.put("status", "Error");
-                responseOobj.put("message", "Something went very wrong");
-                response.getWriter().write(responseOobj.toJSONString());
-                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", throwable.getStackTrace());
-            }
+            
         } catch (IOException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", ex);
         }
     }
+
     private int getErrorCode(HttpServletRequest httpRequest) {
         return (Integer) httpRequest
-          .getAttribute("javax.servlet.error.status_code");
+                .getAttribute("javax.servlet.error.status_code");
     }
 
     // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code.">
