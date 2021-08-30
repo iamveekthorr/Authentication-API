@@ -106,7 +106,12 @@
             <artifactId>heroku-maven-plugin</artifactId>
             <version>3.0.4</version>
         </dependency>
-
+        <!-- https://mvnrepository.com/artifact/io.github.cdimascio/java-dotenv -->
+        <dependency>
+            <groupId>io.github.cdimascio</groupId>
+            <artifactId>java-dotenv</artifactId>
+            <version>5.2.2</version>
+        </dependency>
     </dependencies>
 
     <build>
