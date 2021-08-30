@@ -6,10 +6,6 @@
 package services;
 
 import java.io.IOException;
-import java.io.PrintStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.util.logging.Logger;
 import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -43,9 +39,6 @@ public class SetRequestHeaders implements Filter {
         if (DEBUG) {
             log("SetRequestSecurityHeaders:DoBeforeProcessing");
         }
-        System.getenv().forEach((k, v) -> {
-            System.out.println(k + ":" + v);
-        });
         // Write code here to process the request and/or response before
         // the rest of the filter chain is invoked.
         // For example, a logging filter might log items on the request object,

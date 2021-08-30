@@ -28,6 +28,7 @@ import javax.xml.bind.DatatypeConverter;
 import models.UserModel;
 import org.json.simple.JSONObject;
 import utils.AppError;
+import utils.DotEnvLoader;
 import utils.PropLoader;
 
 /**
@@ -58,8 +59,7 @@ public class AuthenticationService {
         Date now = new Date(nowMillis);
 
         // We will sign our JWT with our ApiKey secret
-        byte[] apiKeySecretBytes = DatatypeConverter.parseBase64Binary(PropLoader.loadPropertiesFile()
-                .getProperty("SECERET_KEY"));
+        byte[] apiKeySecretBytes = DatatypeConverter.parseBase64Binary(DotEnvLoader.getDotenv().get("SECERET_KEY"));
         Key signingKey = new SecretKeySpec(apiKeySecretBytes, signatureAlgorithm.getJcaName());
 
         // Let's set the JWT Claims
@@ -82,7 +82,7 @@ public class AuthenticationService {
         // This line will throw an exception if it is not a signed JWS (as expected
         Claims claims;
         claims = Jwts.parserBuilder().setSigningKey(DatatypeConverter.parseBase64Binary(
-                PropLoader.loadPropertiesFile().getProperty("SECERET_KEY")))
+                DotEnvLoader.getDotenv().get("SECERET_KEY")))
                 .build().parseClaimsJws(jwt).getBody();
         return claims;
     }
@@ -173,7 +173,7 @@ public class AuthenticationService {
 
             // 2d) Create JSONWebToken
             token = createJWT(String.valueOf(userModel.getID()),
-                    PropLoader.loadPropertiesFile().getProperty("JWT_ISSUER"),
+                    DotEnvLoader.getDotenv().get("JWT_ISSUER"),
                     firstName.concat(" ").concat(lastName), 60 * 60 * 24);
             // 3) Create new Cookie  
             Cookie cookie = new Cookie("jwt", token.toString());
@@ -263,7 +263,7 @@ public class AuthenticationService {
 
             // 2b) Create JSONWebToken
             token = createJWT(String.valueOf(userModel.getID()),
-                    PropLoader.loadPropertiesFile().getProperty("JWT_ISSUER"),
+                    DotEnvLoader.getDotenv().get("SECRET_KEY"),
                     userModel.getFirstName(), 60 * 60 * 24);
 
             // 3) Create new Cookie  

@@ -11,7 +11,7 @@ import java.sql.SQLException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import services.UserService;
-import utils.PropLoader;
+import utils.DotEnvLoader;
 
 /**
  *
@@ -23,10 +23,10 @@ public class ConnectionDao extends DaoFactory {
     public static Connection createConnection() {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
-            DATABASE_CONNECTION = DriverManager.getConnection(PropLoader.loadPropertiesFile().getProperty("DATABASE_URL")
-                    .concat(PropLoader.loadPropertiesFile().getProperty("TIME_ZONE")),
-                    PropLoader.loadPropertiesFile().getProperty("DATABASE_USER"),
-                    PropLoader.loadPropertiesFile().getProperty("DATABASE_PASSWORD"));
+            DATABASE_CONNECTION = DriverManager.getConnection(DotEnvLoader.getDotenv().get("DATABASE_URL")
+                    + DotEnvLoader.getDotenv().get("TIME_ZONE"),
+                    DotEnvLoader.getDotenv().get("DATABASE_USER"),
+                    DotEnvLoader.getDotenv().get("DATABASE_PASSWORD"));
             return DATABASE_CONNECTION;
         } catch (SQLException | ClassNotFoundException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "SQL Exception", ex);
