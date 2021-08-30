@@ -42,33 +42,46 @@ public class ErrorController extends HttpServlet {
         response.setContentType("applicatin/json");
         response.setCharacterEncoding("UTF-8");
         try {
-
             if (((String) request.getAttribute("javax.servlet.error.servlet_name")) == null) {
+                System.out.println("Entered 404");
                 responseOobj.put("status", "fail");
                 responseOobj.put("message", "Could not find " + request.getRequestURI() + " on this server");
                 response.getWriter().write(responseOobj.toJSONString());
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", throwable);
+                return;
             }
 
-            if (getErrorCode(request) == 500) {
-                System.out.println(throwable);
-                responseOobj.put("status", "Error");
-                responseOobj.put("message", "Something went very wrong");
-                response.getWriter().write(responseOobj.toJSONString());
-                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", throwable.getStackTrace());
-            }
-            
             if (throwable != null) {
                 if (throwable instanceof ServletException) {
+                    responseOobj.put("status", "Error");
+                    responseOobj.put("message", "Something went very wrong");
+                    response.getWriter().write(responseOobj.toJSONString());
+                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                     Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", throwable);
                     return;
                 }
                 if (throwable instanceof SQLException) {
+                    responseOobj.put("status", "Error");
+                    responseOobj.put("message", "Something went very wrong");
+                    response.getWriter().write(responseOobj.toJSONString());
+                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                     Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", throwable);
                     return;
                 }
                 if (throwable instanceof IOException) {
+                    responseOobj.put("status", "Error");
+                    responseOobj.put("message", "Something went very wrong");
+                    response.getWriter().write(responseOobj.toJSONString());
+                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", throwable);
+                    return;
+                }
+                if (throwable instanceof NullPointerException) {
+                    responseOobj.put("status", "Error");
+                    responseOobj.put("message", "Something went very wrong");
+                    response.getWriter().write(responseOobj.toJSONString());
+                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                     Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", throwable);
                     return;
                 }
@@ -80,12 +93,13 @@ public class ErrorController extends HttpServlet {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 }
             }
-            
+
         } catch (IOException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", ex);
         }
     }
 
+    // FOR HANDLING INTERNAL SERVER ERRORS
     private int getErrorCode(HttpServletRequest httpRequest) {
         return (Integer) httpRequest
                 .getAttribute("javax.servlet.error.status_code");

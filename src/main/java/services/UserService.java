@@ -66,14 +66,14 @@ public class UserService implements UserDao {
     }
 
     @Override
-    public UserModel getById(int id) {
+    public UserModel getById(Object id) {
         Connection conn = ConnectionDao.createConnection();
         users = new ArrayList<>();
         String sql = "SELECT * FROM users WHERE ID = ?";
         try {
             PreparedStatement statement = conn.prepareStatement(sql);
             statement.execute();
-            statement.setInt(1, id);
+            statement.setObject(1, id);
             user = statement.executeQuery();
             while (user.next()) {
                 return users.get(0);

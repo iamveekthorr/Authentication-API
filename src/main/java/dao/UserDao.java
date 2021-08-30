@@ -14,7 +14,7 @@ import models.UserModel;
  * @author Victor Okonkwo
  */
 public interface UserDao{
-    UserModel getById(int id);
+    UserModel getById(Object id);
     
     List<UserModel> getAll();
     

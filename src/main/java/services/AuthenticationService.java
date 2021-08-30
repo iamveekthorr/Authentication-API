@@ -81,15 +81,10 @@ public class AuthenticationService {
     public static Claims decodeJWT(String jwt) {
         // This line will throw an exception if it is not a signed JWS (as expected
         Claims claims;
-        try {
-            claims = Jwts.parserBuilder().setSigningKey(DatatypeConverter.parseBase64Binary(
-                    PropLoader.loadPropertiesFile().getProperty("SECERET_KEY")))
-                    .build().parseClaimsJws(jwt).getBody();
-            return claims;
-        } catch (MalformedJwtException ex) {
-            Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
-        }
-        return null;
+        claims = Jwts.parserBuilder().setSigningKey(DatatypeConverter.parseBase64Binary(
+                PropLoader.loadPropertiesFile().getProperty("SECERET_KEY")))
+                .build().parseClaimsJws(jwt).getBody();
+        return claims;
     }
 
     public void signup(HttpServletRequest req, HttpServletResponse res) {
@@ -114,9 +109,7 @@ public class AuthenticationService {
             lastName = (String) userObject.get("lastName");
 
             // 1b) Check fields for null values in request bidy
-            if (email == null || password == null || confirmPassword == null
-                    || firstName == null || lastName == null
-                    || email.isBlank() || password.isBlank() || confirmPassword.isBlank()
+            if (email.isBlank() || password.isBlank() || confirmPassword.isBlank()
                     || firstName.isBlank() || lastName.isBlank()) {
                 // Throw error if the values are not found 
                 try {
@@ -181,21 +174,21 @@ public class AuthenticationService {
             // 2d) Create JSONWebToken
             token = createJWT(String.valueOf(userModel.getID()),
                     PropLoader.loadPropertiesFile().getProperty("JWT_ISSUER"),
-                    firstName.concat(" ").concat(lastName), 1000000);
+                    firstName.concat(" ").concat(lastName), 60 * 60 * 24);
             // 3) Create new Cookie  
             Cookie cookie = new Cookie("jwt", token.toString());
             // 3a) Add token to cookie
             res.addCookie(cookie);
             // 3b) Create JSON response object  
             JSONObject responseOobj = new JSONObject();
-            
+
             // 3c) create new user object to send to client 
-            Map<String, Object> newUserObject =  new HashMap<>();            
+            Map<String, Object> newUserObject = new HashMap<>();
             newUserObject.put("_id", userModel.getID());
             newUserObject.put("firstName", userModel.getFirstName());
             newUserObject.put("lastName", userModel.getLastName());
             newUserObject.put("email", userModel.getEmail());
-            
+
             // 4a) Create response object and send to client
             responseOobj.put("status", "success");
             responseOobj.put("message", "User created successfully");
@@ -203,7 +196,7 @@ public class AuthenticationService {
             responseOobj.put("data", newUserObject);
             res.setContentType("application/json");
             res.setCharacterEncoding("UTF-8");
-            
+
             // 4b) Write object to client 
             res.getWriter().write(responseOobj.toJSONString());
         } catch (AppError | IOException ex) {
@@ -231,7 +224,7 @@ public class AuthenticationService {
             password = (String) userObject.get("password");
 
             // 1b) Check fields for null values in request bidy
-            if (email == null || password == null || email.isBlank() || password.isBlank()) {
+            if (email.isBlank() || password.isBlank()) {
                 // Throw error if the values are not found 
                 try {
                     res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -257,7 +250,7 @@ public class AuthenticationService {
                     res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                     responseOobj = new JSONObject();
                     responseOobj.put("status", "fail");
-                    responseOobj.put("message", "Email and Password are both required");
+                    responseOobj.put("message", "Incorrect login Credentials. Please check email or password");
                     res.setContentType("application/json");
                     res.setCharacterEncoding("UTF-8");
                     res.getWriter().write(responseOobj.toJSONString());
@@ -271,20 +264,20 @@ public class AuthenticationService {
             // 2b) Create JSONWebToken
             token = createJWT(String.valueOf(userModel.getID()),
                     PropLoader.loadPropertiesFile().getProperty("JWT_ISSUER"),
-                    userModel.getFirstName(), 1000000);
+                    userModel.getFirstName(), 60 * 60 * 24);
 
             // 3) Create new Cookie  
             Cookie cookie = new Cookie("jwt", token.toString());
             // 3a) Add token to cookie
             res.addCookie(cookie);
-            
+
             // 3a) Create user object
-            Map<String, Object> newUserObject =  new HashMap<>();            
+            Map<String, Object> newUserObject = new HashMap<>();
             newUserObject.put("_id", userModel.getID());
             newUserObject.put("firstName", userModel.getFirstName());
             newUserObject.put("lastName", userModel.getLastName());
             newUserObject.put("email", userModel.getEmail());
-            
+
             // 3b) Create JSON response object  
             responseOobj = new JSONObject();
             responseOobj.put("token", token);
@@ -337,7 +330,13 @@ public class AuthenticationService {
             }
 
             try {
-                Object currentUser = decodeJWT(token.toString()).getId();
+                // 1) Get user ID from the Generated Token 
+                Object currentUserID = decodeJWT(token.toString()).getId();
+
+                // 2) Check if current user is an authenticated user
+                UserService userService = new UserService();
+                Object currentUser = userService.getById(currentUserID);
+
                 if (currentUser == null) {
                     try {
                         throw new AppError("This user does not exist", res);

@@ -24,7 +24,7 @@ import javax.servlet.http.HttpServletResponse;
  *
  * @author Victor Okonkwo
  */
-@WebFilter(filterName = "CSP", urlPatterns = {"/*"}, dispatcherTypes = {DispatcherType.REQUEST, DispatcherType.FORWARD, DispatcherType.ERROR, DispatcherType.INCLUDE})
+@WebFilter(filterName = "SetRequestSecurityHeaders", urlPatterns = {"/*"}, dispatcherTypes = {DispatcherType.REQUEST, DispatcherType.FORWARD, DispatcherType.ERROR, DispatcherType.INCLUDE})
 public class SetRequestHeaders implements Filter {
 
     private static final boolean DEBUG = true;
@@ -41,7 +41,7 @@ public class SetRequestHeaders implements Filter {
     private void doBeforeProcessing(ServletRequest request, ServletResponse response)
             throws IOException, ServletException {
         if (DEBUG) {
-            log("CSP:DoBeforeProcessing");
+            log("SetRequestSecurityHeaders:DoBeforeProcessing");
         }
 
         // Write code here to process the request and/or response before
@@ -75,38 +75,18 @@ public class SetRequestHeaders implements Filter {
             throws IOException, ServletException {
 
         if (DEBUG) {
-            log("CSP:doFilter()");
+            log("SetRequestSecurityHeaders:doFilter()");
         }
 
         doBeforeProcessing(request, response);
-
-        Throwable problem = null;
-        try {
-            chain.doFilter(request, response);
-        } catch (IOException | ServletException t) {
-            // If an exception is thrown somewhere down the filter chain,
-            // we still want to execute our after processing, and then
-            // rethrow the problem after that.
-            problem = t;
-            Logger.getLogger(t.getMessage());
-        }
-
-        // If there was a problem, we want to rethrow it if it is
-        // a known type, otherwise log it.
-        if (problem != null) {
-            if (problem instanceof ServletException) {
-                throw (ServletException) problem;
-            }
-            if (problem instanceof IOException) {
-                throw (IOException) problem;
-            }
-            sendProcessingError(problem, response);
-        }
+        chain.doFilter(request, response);
     }
 
     /**
      * Return the filter configuration object for this filter.
-     * @return      */
+     *
+     * @return
+     */
     public FilterConfig getFilterConfig() {
         return (this.filterConfig);
     }
@@ -129,6 +109,7 @@ public class SetRequestHeaders implements Filter {
 
     /**
      * Init method for this filter
+     *
      * @param filterConfig
      */
     @Override
@@ -136,7 +117,7 @@ public class SetRequestHeaders implements Filter {
         this.filterConfig = filterConfig;
         if (filterConfig != null) {
             if (DEBUG) {
-                log("CSP:Initializing filter");
+                log("SetRequestSecurityHeaders:Initializing filter");
             }
         }
     }
@@ -147,54 +128,12 @@ public class SetRequestHeaders implements Filter {
     @Override
     public String toString() {
         if (filterConfig == null) {
-            return ("CSP()");
+            return ("SetRequestSecurityHeaders()");
         }
-        StringBuilder sb = new StringBuilder("CSP(");
+        StringBuilder sb = new StringBuilder("SetRequestSecurityHeaders(");
         sb.append(filterConfig);
         sb.append(")");
         return (sb.toString());
-    }
-
-    private void sendProcessingError(Throwable t, ServletResponse response) {
-        String stackTrace = getStackTrace(t);
-
-        if (stackTrace != null && !stackTrace.equals("")) {
-            try {
-                response.setContentType("text/html");
-                try (PrintStream ps = new PrintStream(response.getOutputStream()); PrintWriter pw = new PrintWriter(ps)) {
-                    pw.print("<html>\n<head>\n<title>Error</title>\n</head>\n<body>\n"); //NOI18N
-                    
-                    // PENDING! Localize this for next official release
-                    pw.print("<h1>The resource did not process correctly</h1>\n<pre>\n");
-                    pw.print(stackTrace);
-                    pw.print("</pre></body>\n</html>"); //NOI18N
-                }
-                response.getOutputStream().close();
-            } catch (IOException ex) {
-            }
-        } else {
-            try {
-                try (PrintStream ps = new PrintStream(response.getOutputStream())) {
-                    t.printStackTrace(ps);
-                }
-                response.getOutputStream().close();
-            } catch (IOException ex) {
-            }
-        }
-    }
-
-    public static String getStackTrace(Throwable t) {
-        String stackTrace = null;
-        try {
-            StringWriter sw = new StringWriter();
-            PrintWriter pw = new PrintWriter(sw);
-            t.printStackTrace(pw);
-            pw.close();
-            sw.close();
-            stackTrace = sw.getBuffer().toString();
-        } catch (IOException ex) {
-        }
-        return stackTrace;
     }
 
     public void log(String msg) {
