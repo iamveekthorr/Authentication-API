@@ -31,6 +31,7 @@ public class SignUp extends HttpServlet {
      */
     protected void processPostRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        
         AuthenticationService authService = new AuthenticationService();
         authService.signup(request, response);
     }

@@ -14,9 +14,9 @@ import models.UserModel;
  * @author Victor Okonkwo
  */
 public interface UserDao{
-    UserModel getById(Object id);
+    UserModel findById(Object _id);
     
-    List<UserModel> getAll();
+    List<UserModel> findAll();
     
     public boolean save(UserModel m);
     
@@ -24,5 +24,5 @@ public interface UserDao{
     
     public void delete(UserModel m);
     
-    public UserModel getByEmail(String email, Optional<String> password);
+    public UserModel findByEmail(String email, Optional<String> password);
 }

@@ -17,6 +17,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -151,7 +152,7 @@ public class AuthenticationService {
             currentUser = new UserService();
 
             // 2a) Get model from Service
-            UserModel userModel = currentUser.getByEmail(email, Optional.empty());
+            UserModel userModel = currentUser.findByEmail(email, Optional.empty());
             if (userModel != null) {
                 res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 JSONObject responseOobj = new JSONObject();
@@ -165,6 +166,7 @@ public class AuthenticationService {
 
             // 2c) Add fields to model using setters
             userModel = new UserModel();
+            userModel.setID(UUID.randomUUID().toString());
             userModel.setEmail(email);
             userModel.setFirstName(firstName);
             userModel.setLastName(lastName);
@@ -244,7 +246,7 @@ public class AuthenticationService {
             currentUser = new UserService();
 
             // 2a) Get model from Service
-            UserModel userModel = currentUser.getByEmail(email, Optional.of(password));
+            UserModel userModel = currentUser.findByEmail(email, Optional.of(password));
             if (userModel == null) {
                 try {
                     res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -335,7 +337,7 @@ public class AuthenticationService {
 
                 // 2) Check if current user is an authenticated user
                 UserService userService = new UserService();
-                Object currentUser = userService.getById(currentUserID);
+                Object currentUser = userService.findById(currentUserID);
 
                 if (currentUser == null) {
                     try {

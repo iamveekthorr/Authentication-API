@@ -8,6 +8,7 @@ package controllers;
 import io.jsonwebtoken.MalformedJwtException;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.servlet.ServletException;
@@ -80,6 +81,7 @@ public class ErrorController extends HttpServlet {
                 if (throwable instanceof NullPointerException) {
                     responseOobj.put("status", "Error");
                     responseOobj.put("message", "Something went very wrong");
+                    responseOobj.put("Error", throwable.getMessage());
                     response.getWriter().write(responseOobj.toJSONString());
                     response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                     Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", throwable);
@@ -89,9 +91,27 @@ public class ErrorController extends HttpServlet {
                 if (throwable instanceof MalformedJwtException) {
                     responseOobj.put("status", "fail");
                     responseOobj.put("message", "Please Login and try again.");
+                    responseOobj.put("Error", throwable.getMessage());
                     response.getWriter().write(responseOobj.toJSONString());
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 }
+                
+                if(throwable instanceof SQLIntegrityConstraintViolationException){
+                    responseOobj.put("status", "fail");
+                    responseOobj.put("message", "Something went very wrong");
+                    responseOobj.put("error", throwable.getMessage());
+                    response.getWriter().write(responseOobj.toJSONString());
+                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", throwable);
+                    return;
+                }
+
+                responseOobj.put("status", "fail");
+                responseOobj.put("message", "Something went very wrong");
+                responseOobj.put("error", throwable.getMessage());
+                response.getWriter().write(responseOobj.toJSONString());
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", throwable);
             }
 
         } catch (IOException ex) {

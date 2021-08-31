@@ -5,21 +5,32 @@
  */
 package models;
 
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
 /**
  *
  * @author Victor Okonkwo
  */
-
+@Entity
+@Table(name = "users")
+@SuppressWarnings("SerializableClass")
 public class UserModel {
-    String firstName, lastName, password, email;
-    private String id;
+
+    @Id
+    private String _id;
+    String firstName, lastName, password;
+    @Column(unique = true)
+    String email;
 
     public String getID() {
-        return id;
+        return _id;
     }
 
     public void setID(Object id) {
-        this.id = id.toString();
+        this._id = id.toString();
     }
 
     public String getFirstName() {

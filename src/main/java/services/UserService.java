@@ -5,18 +5,14 @@
  */
 package services;
 
-import dao.ConnectionDao;
 import dao.UserDao;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.Persistence;
+import javax.persistence.Query;
 import models.UserModel;
 import org.mindrot.jbcrypt.BCrypt;
 
@@ -26,8 +22,9 @@ import org.mindrot.jbcrypt.BCrypt;
  */
 public class UserService implements UserDao {
 
-    private static List<UserModel> users;
-    private static ResultSet user;
+    UserModel usermodel;
+    private static final EntityManagerFactory entityManager = Persistence.createEntityManagerFactory("persistentUnit");
+    private static final EntityManager entity = entityManager.createEntityManager();
     static final String SALT = BCrypt.gensalt(12);
 
     public UserService() {
@@ -35,28 +32,21 @@ public class UserService implements UserDao {
 
     @Override
     public boolean save(UserModel model) {
-        Connection conn = ConnectionDao.createConnection();
-        String sql = "INSERT INTO users(_id, firstName, lastName, email, password) VALUES(?,?,?,?,?)";
-        try {
-            PreparedStatement statement = conn.prepareStatement(sql);
-            model.setID((UUID.randomUUID().toString()));
-            statement.setString(1, model.getID());
-            statement.setString(2, model.getFirstName());
-            statement.setString(3, model.getLastName());
-            statement.setString(4, model.getEmail());
-            statement.setString(5, BCrypt.hashpw(model.getPassword(), SALT));
-            statement.execute();
-            users.add(model);
-            return true;
-        } catch (SQLException ex) {
-            Logger.getLogger(UserService.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        return false;
+        Query query = entity.createNativeQuery("INSERT INTO users(_id, firstName, lastName, email, password) "
+                + "VALUES(?,?,?,?,?)");
+        entity.getTransaction().begin();
+        query.setParameter("_id", model.getID());
+        query.setParameter("firstName", model.getFirstName());
+        query.setParameter("lastName", model.getLastName());
+        query.setParameter("email", model.getEmail());
+        query.setParameter("password", BCrypt.hashpw(model.getPassword(), SALT));
+        entity.persist(model);
+        entity.getTransaction().commit();
+        return true;
     }
 
     @Override
     public boolean update(UserModel m, String... params) {
-        ConnectionDao.createConnection();
         return true;
     }
 
@@ -66,77 +56,57 @@ public class UserService implements UserDao {
     }
 
     @Override
-    public UserModel getById(Object id) {
-        Connection conn = ConnectionDao.createConnection();
-        users = new ArrayList<>();
-        String sql = "SELECT * FROM users WHERE ID = ?";
-        try {
-            PreparedStatement statement = conn.prepareStatement(sql);
-            statement.execute();
-            statement.setObject(1, id);
-            user = statement.executeQuery();
-            while (user.next()) {
-                return users.get(0);
-            }
-        } catch (SQLException ex) {
-            Logger.getAnonymousLogger().log(Level.SEVERE, "SQL Exception", ex);
+    public UserModel findById(Object _id) {
+       return entity.find(UserModel.class, _id);
+    }
+
+    @Override
+    public List<UserModel> findAll() {
+        Query query = entity.createNativeQuery("SELECT * FROM users", UserModel.class);
+
+        List<UserModel> users = (List<UserModel>) query.getResultList();
+        Iterator iterator = users.iterator();
+
+        while (iterator.hasNext()) {
+            usermodel = (UserModel) iterator.next();
+            return users;
         }
         return null;
     }
 
     @Override
-    public List<UserModel> getAll() {
-        return null;
-    }
-
-    @Override
-    public UserModel getByEmail(String email, Optional<String> password) {
-        // 1a) Create connection to database
-        Connection conn = ConnectionDao.createConnection();
-        UserModel model = new UserModel();
-        users = new ArrayList<>();
-
+    public UserModel findByEmail(String email, Optional<String> password) {
+        
         // 1b) create Query(sql) 
-        String sql = "SELECT * FROM users WHERE email = ?";
-
-        try {
-            PreparedStatement statement = conn.prepareStatement(sql);
-            statement.setString(1, email);
-            // 2a) Execute Query and assign (Returns a ResultSet)
-            user = statement.executeQuery();
-
-            // 2b) Check if password is present in the parameter list 
+        Query query = entity.createQuery("SELECT u FROM UserModel u WHERE u.email=:email", UserModel.class);
+        // 2a) Execute Query and assign (Returns a ResultSet)
+        List<UserModel> user = (List<UserModel>) query.setParameter("email", email).getResultList();
+        Iterator iterator = user.iterator();
+        // 2b) Check if password is present in the parameter list 
+        if (password.isPresent()) {
             /**
              * If password is present then compare plain password to the stored
-             * password in the database. *FOR CHECKING IF USER EXIST
-             * BEFORE CREATING AND ACCOUNT. TO AVOID DUPLICATE FIELDS IN THE
-             * DATABASE AND LOGGIN IN A USER*
+             * password in the database. *FOR CHECKING IF USER EXIST BEFORE
+             * CREATING AND ACCOUNT. TO AVOID DUPLICATE FIELDS IN THE DATABASE
+             * AND LOGGIN IN A USER*
              */
-            if (password.isPresent()) {
-                // Runs as long as ResultSet is > 0
-                while (user.next()) {
-                    // 2c) Compare plain user password with the stored password in the database
-                    if (BCrypt.checkpw(password.get(), user.getString("password"))) {
-                        model.setEmail(email);
-                        model.setFirstName(user.getString("firstName"));
-                        model.setLastName(user.getString("lastName"));
-                        model.setID((String) user.getObject("_id"));
-                        users.add(model);
-                        // returns the user found 
-                        return users.get(0);
-                    }
+            while (iterator.hasNext()) {
+                usermodel = (UserModel) iterator.next();
+                if (BCrypt.checkpw(password.get(), usermodel.getPassword())) {
+                    usermodel.setEmail(email);
+                    usermodel.setFirstName(usermodel.getFirstName());
+                    usermodel.setLastName(usermodel.getLastName());
+                    return usermodel;
                 }
-                return null;
             }
-            // returns true if result of Query(sql) > 0
-            /* ONLY RUNS FOR SIGN-UP */
-            while (user.next()) {
-                model.setEmail(email);
-                users.add(model);
-                return users.get(0);
-            }
-        } catch (SQLException ex) {
-            Logger.getAnonymousLogger().log(Level.SEVERE, "SQL Exception", ex);
+            return null;
+        }
+        // returns true if result of Query(sql) > 0
+        /* ONLY RUNS FOR SIGN-UP */
+        while (iterator.hasNext()) {
+            usermodel = (UserModel) iterator.next();
+            usermodel.setEmail(email);
+            return usermodel;
         }
         return null;
     }
