@@ -9,8 +9,10 @@ import dao.UserDao;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
+import javax.persistence.EntityTransaction;
 import javax.persistence.Persistence;
 import javax.persistence.Query;
 import models.UserModel;
@@ -25,7 +27,6 @@ public class UserService implements UserDao {
     UserModel usermodel;
     private static final EntityManagerFactory entityManager = Persistence.createEntityManagerFactory("persistentUnit");
     private static final EntityManager entity = entityManager.createEntityManager();
-    static final String SALT = BCrypt.gensalt(12);
 
     public UserService() {
     }
@@ -34,14 +35,14 @@ public class UserService implements UserDao {
     public boolean save(UserModel model) {
         Query query = entity.createNativeQuery("INSERT INTO users(_id, firstName, lastName, email, password) "
                 + "VALUES(?,?,?,?,?)");
-        entity.getTransaction().begin();
+        
         query.setParameter("_id", model.getID());
         query.setParameter("firstName", model.getFirstName());
         query.setParameter("lastName", model.getLastName());
         query.setParameter("email", model.getEmail());
-        query.setParameter("password", BCrypt.hashpw(model.getPassword(), SALT));
-        entity.persist(model);
-        entity.getTransaction().commit();
+        query.setParameter("password", model.getPassword());
+        this.executeInsideTransaction(e -> e.persist(model));
+        
         return true;
     }
 
@@ -52,12 +53,12 @@ public class UserService implements UserDao {
 
     @Override
     public void delete(UserModel m) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        this.executeInsideTransaction(e -> e.remove(m));
     }
 
     @Override
     public UserModel findById(Object _id) {
-       return entity.find(UserModel.class, _id);
+        return entity.find(UserModel.class, _id);
     }
 
     @Override
@@ -76,7 +77,7 @@ public class UserService implements UserDao {
 
     @Override
     public UserModel findByEmail(String email, Optional<String> password) {
-        
+
         // 1b) create Query(sql) 
         Query query = entity.createQuery("SELECT u FROM UserModel u WHERE u.email=:email", UserModel.class);
         // 2a) Execute Query and assign (Returns a ResultSet)
@@ -109,6 +110,18 @@ public class UserService implements UserDao {
             return usermodel;
         }
         return null;
+    }
+
+    private void executeInsideTransaction(Consumer<EntityManager> action) {
+        EntityTransaction tx = entity.getTransaction();
+        try {
+            tx.begin();
+            action.accept(entity);
+            tx.commit();
+        } catch (RuntimeException e) {
+            tx.rollback();
+            throw e;
+        }
     }
 
 }

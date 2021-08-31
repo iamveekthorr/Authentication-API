@@ -28,16 +28,18 @@ import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.DatatypeConverter;
 import models.UserModel;
 import org.json.simple.JSONObject;
+import org.mindrot.jbcrypt.BCrypt;
 import utils.AppError;
 import utils.DotEnvLoader;
-import utils.PropLoader;
+import utils.TryCatch;
 
 /**
  *
  * @author Victor Okonkwo
  */
 public class AuthenticationService {
-
+    HttpServletRequest req;
+    HttpServletResponse res;
     public AuthenticationService() {
 
     }
@@ -92,6 +94,7 @@ public class AuthenticationService {
         Object token;
         String email, password, firstName, lastName, confirmPassword;
         UserService currentUser;
+        final String SALT = BCrypt.gensalt(12);
 
         try {
 
@@ -170,7 +173,7 @@ public class AuthenticationService {
             userModel.setEmail(email);
             userModel.setFirstName(firstName);
             userModel.setLastName(lastName);
-            userModel.setPassword(password);
+            userModel.setPassword(BCrypt.hashpw(password, SALT));
             currentUser.save(userModel);
 
             // 2d) Create JSONWebToken
@@ -353,6 +356,15 @@ public class AuthenticationService {
         } catch (NullPointerException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
+    }
+
+    public TryCatch protector =(HttpServletRequest request, HttpServletResponse response) -> {
+        System.out.println(response.getStatus());
+        System.out.println(request.getServerName());
+    };
+    
+    public void doAction(TryCatch action){
+        action.acceptParams(req, res);
     }
 
 }
