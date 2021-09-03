@@ -5,14 +5,13 @@
  */
 package services;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureAlgorithm;
 import java.security.Key;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -52,20 +51,20 @@ public class AuthenticationService {
         Map<String, Object> cookieOptions = new HashMap<>();
         cookieOptions.put("httpOnly", true);
         cookieOptions.put("secure", true);
-        
+
         // The JWT signature algorithm we will be using to sign the token
         SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.HS256;
         long nowMillis = System.currentTimeMillis();
         Date now = new Date(nowMillis);
-        
+
         // We will sign our JWT with our ApiKey secret
         byte[] apiKeySecretBytes = DatatypeConverter.parseBase64Binary(DotEnvLoader.getDotenv().get("SECERET_KEY"));
         Key signingKey = new SecretKeySpec(apiKeySecretBytes, signatureAlgorithm.getJcaName());
-        
+
         // Let's set the JWT Claims
         JwtBuilder builder = signToken(id).setIssuedAt(now).setSubject(subject).setIssuer(issuer).signWith(signingKey,
                 signatureAlgorithm).addClaims(cookieOptions);
-        
+
         // if it has been specified, let's add the expiration
         if (ttlMillis > 0) {
             long expMillis = nowMillis + ttlMillis;
@@ -78,10 +77,11 @@ public class AuthenticationService {
 
     // Decode JWT and verify the Token 
     private Claims decodeJWT(String jwt) {
+        SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.HS256;
+        byte[] apiKeySecretBytes = DatatypeConverter.parseBase64Binary(DotEnvLoader.getDotenv().get("SECERET_KEY"));
+        Key signingKey = new SecretKeySpec(apiKeySecretBytes, signatureAlgorithm.getJcaName());
         // This line will throw an exception if it is not a signed JWS (as expected
-        Claims claims = Jwts.parserBuilder().setSigningKey(DatatypeConverter.parseBase64Binary(
-                DotEnvLoader.getDotenv().get("SECERET_KEY"))).build().parseClaimsJws(jwt).getBody();
-        System.out.println("Claims: " + claims);
+        Claims claims = Jwts.parserBuilder().setSigningKey(signingKey).build().parseClaimsJws(jwt).getBody();
         return claims;
     }
 
@@ -155,15 +155,15 @@ public class AuthenticationService {
             // 2d) Create JSONWebToken
             token = createJWT(String.valueOf(userModel.getID()),
                     DotEnvLoader.getDotenv().get("JWT_ISSUER"),
-                    firstName.concat(" ").concat(lastName), 60 * 60 * 24);
-           
+                    firstName.concat(" ").concat(lastName), 60 * 60 * 24 * 1000);
+
             // 3) Create new Cookie  
             Cookie cookie = new Cookie("jwt", token.toString());
             // 3a) Add token to cookie
             res.addCookie(cookie);
             // 4a) Create response object and send to client
-            SendResponseToClient.sendResponseObject(res, "success", "User LoggedIn successfully", Optional.of(token.toString()),
-                    Optional.empty(), Optional.of(userObject(userModel)));
+            SendResponseToClient.sendResponseObject(res, "success", "User LoggedIn successfully",
+                    Optional.of(token.toString()), Optional.empty(), Optional.of(userObject(userModel)));
         } catch (AppError ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
@@ -208,9 +208,8 @@ public class AuthenticationService {
         // 2b) Create JSONWebToken
         token = createJWT(String.valueOf(userModel.getID()),
                 DotEnvLoader.getDotenv().get("SECRET_KEY"),
-                userModel.getFirstName(), 60 * 60 * 24);
-        System.out.println("UId = " + userModel.getID());
-        
+                userModel.getFirstName().concat(" ").concat(userModel.getLastName()), 60 * 60 * 24 * 1000);
+
         // 3) Create new Cookie
         Cookie cookie = new Cookie("jwt", token.toString());
         // 3a) Add token to cookie
@@ -234,13 +233,15 @@ public class AuthenticationService {
         try {
             if (req.getHeader("Authorization") != null
                     && req.getHeader("Authorization").startsWith("Bearer")) {
-                token = req.getHeader("Authorization").split(" ", 1);
-                System.out.println("Token: " + decodeJWT(token.toString()));
+                token = req.getHeader("Authorization").split(" ")[1];
             } else if (req.getCookies() != null && req.getCookies().length > 0) {
                 token = req.getCookies()[-1];
+                for (Object c : req.getCookies()) {
+                    System.out.println("Cookies " + c.toString());
+                }
             }
 
-            if (token == null) {
+            if (token == null || token.toString().isBlank() || token.toString().isEmpty()) {
                 SendResponseToClient.sendResponseObject(res, "fail", "Please login to continue", Optional.empty(),
                         Optional.empty(), Optional.empty());
                 return;
@@ -249,12 +250,10 @@ public class AuthenticationService {
             try {
                 // 1) Get user ID from the Generated Token 
                 Object currentUserID = decodeJWT(token.toString()).getId();
-                System.out.println(currentUserID + "User id is <-");
 
                 // 2) Check if current user is an authenticated user
                 UserService userService = new UserService();
-                Object currentUser = userService.findById(currentUserID);
-
+                UserModel currentUser = userService.findById(currentUserID);
                 if (currentUser == null) {
                     try {
                         throw new AppError("This user does not exist", res);
