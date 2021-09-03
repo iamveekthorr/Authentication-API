@@ -5,13 +5,13 @@
  */
 package services;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureAlgorithm;
-import java.io.IOException;
 import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
@@ -20,74 +20,78 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.DatatypeConverter;
 import models.UserModel;
-import org.json.simple.JSONObject;
 import org.mindrot.jbcrypt.BCrypt;
 import utils.AppError;
+import utils.BodyParser;
 import utils.DotEnvLoader;
-import utils.TryCatch;
+import utils.SendResponseToClient;
 
 /**
  *
  * @author Victor Okonkwo
  */
 public class AuthenticationService {
-    HttpServletRequest req;
-    HttpServletResponse res;
+
     public AuthenticationService() {
 
     }
 
     // Sign user token based on currently logged in user 
-    public static JwtBuilder signToken(String id) {
+    private JwtBuilder signToken(String id) {
         return Jwts.builder().setId(id);
     }
 
     // create and send Token to the client 
-    public static String createJWT(String id, String issuer, String subject, long ttlMillis) {
+    private String createJWT(String id, String issuer, String subject, long ttlMillis) {
         Map<String, Object> cookieOptions = new HashMap<>();
         cookieOptions.put("httpOnly", true);
         cookieOptions.put("secure", true);
-
+        
         // The JWT signature algorithm we will be using to sign the token
         SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.HS256;
-
         long nowMillis = System.currentTimeMillis();
         Date now = new Date(nowMillis);
-
+        
         // We will sign our JWT with our ApiKey secret
         byte[] apiKeySecretBytes = DatatypeConverter.parseBase64Binary(DotEnvLoader.getDotenv().get("SECERET_KEY"));
         Key signingKey = new SecretKeySpec(apiKeySecretBytes, signatureAlgorithm.getJcaName());
-
+        
         // Let's set the JWT Claims
         JwtBuilder builder = signToken(id).setIssuedAt(now).setSubject(subject).setIssuer(issuer).signWith(signingKey,
-                signatureAlgorithm).setClaims(cookieOptions);
-
+                signatureAlgorithm).addClaims(cookieOptions);
+        
         // if it has been specified, let's add the expiration
         if (ttlMillis > 0) {
             long expMillis = nowMillis + ttlMillis;
             Date exp = new Date(expMillis);
             builder.setExpiration(exp);
         }
-
         // Builds the JWT and serializes it to a compact, URL-safe string
         return builder.compact();
     }
 
     // Decode JWT and verify the Token 
-    public static Claims decodeJWT(String jwt) {
+    private Claims decodeJWT(String jwt) {
         // This line will throw an exception if it is not a signed JWS (as expected
-        Claims claims;
-        claims = Jwts.parserBuilder().setSigningKey(DatatypeConverter.parseBase64Binary(
-                DotEnvLoader.getDotenv().get("SECERET_KEY")))
-                .build().parseClaimsJws(jwt).getBody();
+        Claims claims = Jwts.parserBuilder().setSigningKey(DatatypeConverter.parseBase64Binary(
+                DotEnvLoader.getDotenv().get("SECERET_KEY"))).build().parseClaimsJws(jwt).getBody();
+        System.out.println("Claims: " + claims);
         return claims;
+    }
+
+    private Map<String, Object> userObject(UserModel model) {
+        Map<String, Object> newUserObject = new HashMap<>();
+        newUserObject.put("_id", model.getID());
+        newUserObject.put("firstName", model.getFirstName());
+        newUserObject.put("lastName", model.getLastName());
+        newUserObject.put("email", model.getEmail());
+        return newUserObject;
     }
 
     public void signup(HttpServletRequest req, HttpServletResponse res) {
@@ -97,15 +101,7 @@ public class AuthenticationService {
         final String SALT = BCrypt.gensalt(12);
 
         try {
-
-            ObjectMapper objectMapper = new ObjectMapper();
-
-            // Destructure JSON Object from request body 
-            // 1) Get the request body 
-            String reqBody = req.getReader().lines().collect(Collectors.joining());
-            // 1a)Read the request body
-            Map<String, Object> userObject = objectMapper.readValue(reqBody, Map.class);
-
+            Map<String, Object> userObject = BodyParser.bodyParserMiddleware(req);
             email = (String) userObject.get("email");
             password = (String) userObject.get("password");
             confirmPassword = (String) userObject.get("passwordConfirm");
@@ -116,18 +112,9 @@ public class AuthenticationService {
             if (email.isBlank() || password.isBlank() || confirmPassword.isBlank()
                     || firstName.isBlank() || lastName.isBlank()) {
                 // Throw error if the values are not found 
-                try {
-                    res.setStatus(HttpServletResponse.SC_CONFLICT);
-                    JSONObject responseOobj = new JSONObject();
-                    responseOobj.put("status", "fail");
-                    responseOobj.put("message", "All fields are required");
-                    res.setContentType("application/json");
-                    res.setCharacterEncoding("UTF-8");
-                    res.getWriter().write(responseOobj.toJSONString());
-                    return;
-                } catch (IOException ex) {
-                    Logger.getLogger(AuthenticationService.class.getName()).log(Level.SEVERE, ex.getMessage(), ex);
-                }
+                res.setStatus(HttpServletResponse.SC_CONFLICT);
+                SendResponseToClient.sendResponseObject(res, "fail", "All fields are requireds", Optional.empty(),
+                        Optional.empty(), Optional.empty());
                 return;
             }
             // 1c) Check length of password
@@ -137,18 +124,11 @@ public class AuthenticationService {
 
             // 1d) Compare passwords
             if (!password.equalsIgnoreCase(confirmPassword)) {
-                try {
-                    res.setStatus(HttpServletResponse.SC_CONFLICT);
-                    JSONObject responseOobj = new JSONObject();
-                    responseOobj.put("status", "fail");
-                    responseOobj.put("message", "Password Mismatch");
-                    res.setContentType("application/json");
-                    res.setCharacterEncoding("UTF-8");
-                    res.getWriter().write(responseOobj.toJSONString());
-                    return;
-                } catch (IOException ex) {
-                    Logger.getAnonymousLogger(AuthenticationService.class.getName()).log(Level.SEVERE, ex.getMessage(), ex);
-                }
+                res.setStatus(HttpServletResponse.SC_CONFLICT);
+                SendResponseToClient.sendResponseObject(res, "fail", "Password Mismatch", Optional.empty(),
+                        Optional.empty(), Optional.empty());
+                return;
+
             }
 
             // 2) Check if user exists in the database  
@@ -158,12 +138,8 @@ public class AuthenticationService {
             UserModel userModel = currentUser.findByEmail(email, Optional.empty());
             if (userModel != null) {
                 res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                JSONObject responseOobj = new JSONObject();
-                responseOobj.put("status", "fail");
-                responseOobj.put("message", "User already Exists");
-                res.setContentType("application/json");
-                res.setCharacterEncoding("UTF-8");
-                res.getWriter().write(responseOobj.toJSONString());
+                SendResponseToClient.sendResponseObject(res, "fail", "User already Exists", Optional.empty(),
+                        Optional.empty(), Optional.empty());
                 return;
             }
 
@@ -180,31 +156,15 @@ public class AuthenticationService {
             token = createJWT(String.valueOf(userModel.getID()),
                     DotEnvLoader.getDotenv().get("JWT_ISSUER"),
                     firstName.concat(" ").concat(lastName), 60 * 60 * 24);
+           
             // 3) Create new Cookie  
             Cookie cookie = new Cookie("jwt", token.toString());
             // 3a) Add token to cookie
             res.addCookie(cookie);
-            // 3b) Create JSON response object  
-            JSONObject responseOobj = new JSONObject();
-
-            // 3c) create new user object to send to client 
-            Map<String, Object> newUserObject = new HashMap<>();
-            newUserObject.put("_id", userModel.getID());
-            newUserObject.put("firstName", userModel.getFirstName());
-            newUserObject.put("lastName", userModel.getLastName());
-            newUserObject.put("email", userModel.getEmail());
-
             // 4a) Create response object and send to client
-            responseOobj.put("status", "success");
-            responseOobj.put("message", "User created successfully");
-            responseOobj.put("token", token);
-            responseOobj.put("data", newUserObject);
-            res.setContentType("application/json");
-            res.setCharacterEncoding("UTF-8");
-
-            // 4b) Write object to client 
-            res.getWriter().write(responseOobj.toJSONString());
-        } catch (AppError | IOException ex) {
+            SendResponseToClient.sendResponseObject(res, "success", "User LoggedIn successfully", Optional.of(token.toString()),
+                    Optional.empty(), Optional.of(userObject(userModel)));
+        } catch (AppError ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
     }
@@ -213,89 +173,51 @@ public class AuthenticationService {
         Object token;
         String email, password;
         UserService currentUser;
-        JSONObject responseOobj;
 
-        try {
-
-            ObjectMapper objectMapper = new ObjectMapper();
-
-            // Destructure JSON Object from request body 
-            // 1) Get the request body 
-            String reqBody = req.getReader().lines().collect(Collectors.joining());
-            // 1a)Read the request body
-            Map<String, Object> userObject = objectMapper.readValue(reqBody, Map.class);
-
-            email = (String) userObject.get("email");
-            password = (String) userObject.get("password");
-
-            // 1b) Check fields for null values in request bidy
-            if (email.isBlank() || password.isBlank()) {
-                // Throw error if the values are not found 
-                try {
-                    res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                    responseOobj = new JSONObject();
-                    responseOobj.put("status", "fail");
-                    responseOobj.put("message", "Email and Password are both required");
-                    res.setContentType("application/json");
-                    res.setCharacterEncoding("UTF-8");
-                    res.getWriter().write(responseOobj.toJSONString());
-                    throw new AppError("Email and Password are both required", res);
-                } catch (AppError ex) {
-                    Logger.getLogger(AuthenticationService.class.getName()).log(Level.SEVERE, ex.getMessage(), ex);
-                }
-                return;
+        Map<String, Object> userObject = BodyParser.bodyParserMiddleware(req);
+        email = (String) userObject.get("email");
+        password = (String) userObject.get("password");
+        // 1b) Check fields for null values in request bidy
+        if (email.isBlank() || password.isBlank()) {
+            // Throw error if the values are not found
+            try {
+                res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                SendResponseToClient.sendResponseObject(res, "fail", "Email and Password are both required", Optional.empty(),
+                        Optional.empty(), Optional.empty());
+                throw new AppError("Email and Password are both required", res);
+            } catch (AppError ex) {
+                Logger.getLogger(AuthenticationService.class.getName()).log(Level.SEVERE, ex.getMessage(), ex);
             }
-            // 2) Check if user exists and password is correct 
-            currentUser = new UserService();
-
-            // 2a) Get model from Service
-            UserModel userModel = currentUser.findByEmail(email, Optional.of(password));
-            if (userModel == null) {
-                try {
-                    res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                    responseOobj = new JSONObject();
-                    responseOobj.put("status", "fail");
-                    responseOobj.put("message", "Incorrect login Credentials. Please check email or password");
-                    res.setContentType("application/json");
-                    res.setCharacterEncoding("UTF-8");
-                    res.getWriter().write(responseOobj.toJSONString());
-                    throw new AppError("Incorrect login Credentials. Please check email or password", res);
-                } catch (AppError ex) {
-                    Logger.getLogger(AuthenticationService.class.getName()).log(Level.SEVERE, ex.getMessage(), ex);
-                }
-                return;
-            }
-
-            // 2b) Create JSONWebToken
-            token = createJWT(String.valueOf(userModel.getID()),
-                    DotEnvLoader.getDotenv().get("SECRET_KEY"),
-                    userModel.getFirstName(), 60 * 60 * 24);
-
-            // 3) Create new Cookie  
-            Cookie cookie = new Cookie("jwt", token.toString());
-            // 3a) Add token to cookie
-            res.addCookie(cookie);
-
-            // 3a) Create user object
-            Map<String, Object> newUserObject = new HashMap<>();
-            newUserObject.put("_id", userModel.getID());
-            newUserObject.put("firstName", userModel.getFirstName());
-            newUserObject.put("lastName", userModel.getLastName());
-            newUserObject.put("email", userModel.getEmail());
-
-            // 3b) Create JSON response object  
-            responseOobj = new JSONObject();
-            responseOobj.put("token", token);
-            responseOobj.put("status", "success");
-            responseOobj.put("message", "user successfuly logged in");
-            responseOobj.put("data", newUserObject);
-            res.setContentType("application/json");
-            res.setCharacterEncoding("UTF-8");
-            res.getWriter().write(responseOobj.toJSONString());
-
-        } catch (IOException ex) {
-            Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
+            return;
         }
+        // 2) Check if user exists and password is correct
+        currentUser = new UserService();
+        // 2a) Get model from Service
+        UserModel userModel = currentUser.findByEmail(email, Optional.of(password));
+        if (userModel == null) {
+            try {
+                res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                SendResponseToClient.sendResponseObject(res, "fail", "Incorrect login Credentials. Please check email or password",
+                        Optional.empty(), Optional.empty(), Optional.empty());
+                throw new AppError("Incorrect login Credentials. Please check email or password", res);
+            } catch (AppError ex) {
+                Logger.getLogger(AuthenticationService.class.getName()).log(Level.SEVERE, ex.getMessage(), ex);
+            }
+            return;
+        }
+        // 2b) Create JSONWebToken
+        token = createJWT(String.valueOf(userModel.getID()),
+                DotEnvLoader.getDotenv().get("SECRET_KEY"),
+                userModel.getFirstName(), 60 * 60 * 24);
+        System.out.println("UId = " + userModel.getID());
+        
+        // 3) Create new Cookie
+        Cookie cookie = new Cookie("jwt", token.toString());
+        // 3a) Add token to cookie
+        res.addCookie(cookie);
+        // 3b) Create JSON response object
+        SendResponseToClient.sendResponseObject(res, "success", "User Created Successfully", Optional.of(token.toString()),
+                Optional.empty(), Optional.of(userObject(userModel)));
     }
 
     public void logOut(HttpServletRequest req, HttpServletResponse res) {
@@ -303,40 +225,31 @@ public class AuthenticationService {
         Cookie cookie = new Cookie("jwt", token.toString());
         cookie.setMaxAge(0);
         res.addCookie(cookie);
-        try {
-            JSONObject obj = new JSONObject();
-            obj.put("token", "Logged out");
-            obj.put("status", "success");
-            res.setContentType("application/json");
-            res.setCharacterEncoding("UTF-8");
-            res.getWriter().write(obj.toJSONString());
-        } catch (IOException ex) {
-            Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
-        }
+        SendResponseToClient.sendResponseObject(res, "success", "logged Out", Optional.empty(),
+                Optional.empty(), Optional.empty());
     }
 
-    void protect(HttpServletRequest req, HttpServletResponse res) {
+    public void protect(HttpServletRequest req, HttpServletResponse res) {
         Object token = null;
         try {
             if (req.getHeader("Authorization") != null
                     && req.getHeader("Authorization").startsWith("Bearer")) {
                 token = req.getHeader("Authorization").split(" ", 1);
-            } else if (req.getCookies() != null) {
-                token = req.getHeader("Cookie");
+                System.out.println("Token: " + decodeJWT(token.toString()));
+            } else if (req.getCookies() != null && req.getCookies().length > 0) {
+                token = req.getCookies()[-1];
             }
 
             if (token == null) {
-                try {
-                    throw new AppError("Please login and try again", res);
-                } catch (AppError ex) {
-                    Logger.getAnonymousLogger().log(Level.SEVERE, ex.getMessage(), ex.getCause());
-                }
+                SendResponseToClient.sendResponseObject(res, "fail", "Please login to continue", Optional.empty(),
+                        Optional.empty(), Optional.empty());
                 return;
             }
 
             try {
                 // 1) Get user ID from the Generated Token 
                 Object currentUserID = decodeJWT(token.toString()).getId();
+                System.out.println(currentUserID + "User id is <-");
 
                 // 2) Check if current user is an authenticated user
                 UserService userService = new UserService();
@@ -352,19 +265,8 @@ public class AuthenticationService {
             } catch (MalformedJwtException ex) {
                 Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", ex);
             }
-
         } catch (NullPointerException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
     }
-
-    public TryCatch protector =(HttpServletRequest request, HttpServletResponse response) -> {
-        System.out.println(response.getStatus());
-        System.out.println(request.getServerName());
-    };
-    
-    public void doAction(TryCatch action){
-        action.acceptParams(req, res);
-    }
-
 }
