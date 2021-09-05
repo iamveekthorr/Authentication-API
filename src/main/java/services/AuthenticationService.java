@@ -11,10 +11,12 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureAlgorithm;
 import java.security.Key;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -28,6 +30,7 @@ import models.UserModel;
 import org.mindrot.jbcrypt.BCrypt;
 import utils.AppError;
 import utils.BodyParser;
+import utils.CreateUserJSONObject;
 import utils.DotEnvLoader;
 import utils.SendResponseToClient;
 
@@ -47,10 +50,12 @@ public class AuthenticationService {
     }
 
     // create and send Token to the client 
-    private String createJWT(String id, String issuer, String subject, long ttlMillis) {
+    private String createJWT(String id, String issuer, String subject) {
         Map<String, Object> cookieOptions = new HashMap<>();
         cookieOptions.put("httpOnly", true);
         cookieOptions.put("secure", true);
+        cookieOptions.put("expires", new Date(
+            Date.from(Instant.now()).getTime() + 90 * 24 * 60 * 60 * 1000));
 
         // The JWT signature algorithm we will be using to sign the token
         SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.HS256;
@@ -65,12 +70,6 @@ public class AuthenticationService {
         JwtBuilder builder = signToken(id).setIssuedAt(now).setSubject(subject).setIssuer(issuer).signWith(signingKey,
                 signatureAlgorithm).addClaims(cookieOptions);
 
-        // if it has been specified, let's add the expiration
-        if (ttlMillis > 0) {
-            long expMillis = nowMillis + ttlMillis;
-            Date exp = new Date(expMillis);
-            builder.setExpiration(exp);
-        }
         // Builds the JWT and serializes it to a compact, URL-safe string
         return builder.compact();
     }
@@ -81,17 +80,8 @@ public class AuthenticationService {
         byte[] apiKeySecretBytes = DatatypeConverter.parseBase64Binary(DotEnvLoader.getDotenv().get("SECERET_KEY"));
         Key signingKey = new SecretKeySpec(apiKeySecretBytes, signatureAlgorithm.getJcaName());
         // This line will throw an exception if it is not a signed JWS (as expected
-        Claims claims = Jwts.parserBuilder().setSigningKey(signingKey).build().parseClaimsJws(jwt).getBody();
+        Claims claims = Jwts.parserBuilder().setAllowedClockSkewSeconds(3*60).setSigningKey(signingKey).build().parseClaimsJws(jwt).getBody();
         return claims;
-    }
-
-    private Map<String, Object> userObject(UserModel model) {
-        Map<String, Object> newUserObject = new HashMap<>();
-        newUserObject.put("_id", model.getID());
-        newUserObject.put("firstName", model.getFirstName());
-        newUserObject.put("lastName", model.getLastName());
-        newUserObject.put("email", model.getEmail());
-        return newUserObject;
     }
 
     public void signup(HttpServletRequest req, HttpServletResponse res) {
@@ -119,6 +109,7 @@ public class AuthenticationService {
             }
             // 1c) Check length of password
             if (password.length() < 8) {
+                res.setStatus(HttpServletResponse.SC_CONFLICT);
                 throw new AppError("Password must be equal to more than 8 characters", res);
             }
 
@@ -155,7 +146,7 @@ public class AuthenticationService {
             // 2d) Create JSONWebToken
             token = createJWT(String.valueOf(userModel.getID()),
                     DotEnvLoader.getDotenv().get("JWT_ISSUER"),
-                    firstName.concat(" ").concat(lastName), 60 * 60 * 24 * 1000);
+                    firstName.concat(" ").concat(lastName));
 
             // 3) Create new Cookie  
             Cookie cookie = new Cookie("jwt", token.toString());
@@ -163,7 +154,7 @@ public class AuthenticationService {
             res.addCookie(cookie);
             // 4a) Create response object and send to client
             SendResponseToClient.sendResponseObject(res, "success", "User LoggedIn successfully",
-                    Optional.of(token.toString()), Optional.empty(), Optional.of(userObject(userModel)));
+                    Optional.of(token.toString()), Optional.empty(), Optional.of(CreateUserJSONObject.userObject(userModel)));
         } catch (AppError ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
@@ -208,7 +199,7 @@ public class AuthenticationService {
         // 2b) Create JSONWebToken
         token = createJWT(String.valueOf(userModel.getID()),
                 DotEnvLoader.getDotenv().get("SECRET_KEY"),
-                userModel.getFirstName().concat(" ").concat(userModel.getLastName()), 60 * 60 * 24 * 1000);
+                userModel.getFirstName().concat(" ").concat(userModel.getLastName()));
 
         // 3) Create new Cookie
         Cookie cookie = new Cookie("jwt", token.toString());
@@ -216,7 +207,7 @@ public class AuthenticationService {
         res.addCookie(cookie);
         // 3b) Create JSON response object
         SendResponseToClient.sendResponseObject(res, "success", "User Created Successfully", Optional.of(token.toString()),
-                Optional.empty(), Optional.of(userObject(userModel)));
+                Optional.empty(), Optional.of(CreateUserJSONObject.userObject(userModel)));
     }
 
     public void logOut(HttpServletRequest req, HttpServletResponse res) {
@@ -228,44 +219,47 @@ public class AuthenticationService {
                 Optional.empty(), Optional.empty());
     }
 
-    public void protect(HttpServletRequest req, HttpServletResponse res) {
+    public boolean protect(HttpServletRequest req, HttpServletResponse res) {
         Object token = null;
         try {
+            
             if (req.getHeader("Authorization") != null
                     && req.getHeader("Authorization").startsWith("Bearer")) {
+                
                 token = req.getHeader("Authorization").split(" ")[1];
+                
             } else if (req.getCookies() != null && req.getCookies().length > 0) {
-                token = req.getCookies()[-1];
-                for (Object c : req.getCookies()) {
-                    System.out.println("Cookies " + c.toString());
+                for(Cookie cookie : req.getCookies()){
+                    if(cookie.getName().equalsIgnoreCase("jwt")) token = cookie;
                 }
             }
-
-            if (token == null || token.toString().isBlank() || token.toString().isEmpty()) {
+            
+            if (Objects.deepEquals(token, "null") || token == null || 
+                    token.toString().isBlank() || token.toString().isEmpty()) {
                 SendResponseToClient.sendResponseObject(res, "fail", "Please login to continue", Optional.empty(),
                         Optional.empty(), Optional.empty());
-                return;
+                res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                return false;
             }
-
-            try {
-                // 1) Get user ID from the Generated Token 
-                Object currentUserID = decodeJWT(token.toString()).getId();
-
-                // 2) Check if current user is an authenticated user
-                UserService userService = new UserService();
-                UserModel currentUser = userService.findById(currentUserID);
-                if (currentUser == null) {
-                    try {
-                        throw new AppError("This user does not exist", res);
-                    } catch (AppError ex) {
-                        Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", ex);
-                    }
+            
+            // 1) Get user ID from the Generated Token 
+            Object currentUserID = decodeJWT((String) token).getId();
+            // 2) Check if current user is an authenticated user
+            UserService userService = new UserService();
+            UserModel currentUser = userService.findById(currentUserID);
+            if (currentUser == null) {
+                try {
+                    throw new AppError("This user does not exist", res);
+                } catch (AppError ex) {
+                    Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", ex);
                 }
-            } catch (MalformedJwtException ex) {
-                Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", ex);
+                return false;
             }
-        } catch (NullPointerException ex) {
+            return true;
+
+        } catch (NullPointerException | MalformedJwtException ex) {
             Logger.getAnonymousLogger().log(Level.SEVERE, "Logged", ex);
         }
+        return false;
     }
 }

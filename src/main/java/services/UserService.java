@@ -68,7 +68,6 @@ public class UserService implements UserDao {
         List<UserModel> users = (List<UserModel>) query.getResultList();
         Iterator iterator = users.iterator();
         while (iterator.hasNext()) {
-            usermodel = (UserModel) iterator.next();
             return users;
         }
         return null;

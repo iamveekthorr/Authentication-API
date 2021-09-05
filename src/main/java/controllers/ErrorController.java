@@ -5,7 +5,6 @@
  */
 package controllers;
 
-import io.jsonwebtoken.MalformedJwtException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.sql.SQLIntegrityConstraintViolationException;
@@ -86,14 +85,6 @@ public class ErrorController extends HttpServlet {
                     response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                     Logger.getAnonymousLogger().log(Level.SEVERE, "Fail", throwable);
                     return;
-                }
-
-                if (throwable instanceof MalformedJwtException) {
-                    responseOobj.put("status", "fail");
-                    responseOobj.put("message", "Please Login and try again.");
-                    responseOobj.put("Error", throwable.getMessage());
-                    response.getWriter().write(responseOobj.toJSONString());
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 }
                 
                 if(throwable instanceof SQLIntegrityConstraintViolationException){

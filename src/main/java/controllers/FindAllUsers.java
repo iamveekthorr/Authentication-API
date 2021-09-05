@@ -6,15 +6,12 @@
 package controllers;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import models.UserModel;
 import services.AuthenticationService;
-import services.UserService;
 
 /**
  *
@@ -35,12 +32,12 @@ public class FindAllUsers extends HttpServlet {
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         AuthenticationService authController = new AuthenticationService();
-        authController.protect(request, response);
+        UserController userController = new UserController();
         
-        UserService userController = new UserService();
-        userController.findAll().forEach(user -> {
-            System.out.println(user.getEmail());
-        });
+        if(authController.protect(request, response) == true){
+            userController.findAll(response);
+        }
+
     }
 
     // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code.">
